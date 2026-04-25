@@ -1,0 +1,8 @@
+Folder:
+Silver Data
+
+Data Files:
+- s_incidentes_por_dia.csv
+
+Log Files:
+- log_s_incidentes_por_dia.csv

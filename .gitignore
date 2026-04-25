@@ -173,7 +173,8 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# Pastas de dados
-raw data/
+# Arquivos de Dados
+0_raw_data/LW-DATASET-CSV.CSV
+1_bronze_data/b_incidentes.csv
 
 # End of https://www.toptal.com/developers/gitignore/api/python

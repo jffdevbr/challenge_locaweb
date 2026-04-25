@@ -1,0 +1,8 @@
+Folder:
+Bronze Data
+
+Data Files:
+- b_incidentes.csv
+
+Log Files:
+- log_b_incidentes.csv
