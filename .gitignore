@@ -176,5 +176,7 @@ pyrightconfig.json
 # Arquivos de Dados
 0_raw_data/LW-DATASET-CSV.CSV
 1_bronze_data/b_incidentes.csv
+2_silver_data/s_temporal.csv
+2_silver_data/s_volume.csv
 
 # End of https://www.toptal.com/developers/gitignore/api/python
