@@ -1,6 +1,0 @@
-Folder:
-Silver Data
-
-Data Files:
-- s_volume.csv
-- s_temporal.csv
