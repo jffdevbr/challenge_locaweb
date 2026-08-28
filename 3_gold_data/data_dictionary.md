@@ -1,8 +1,8 @@
 # Dicionário de dados — Gold
 
-Saída da Seção 8 de `notebooks/model_training.ipynb`. São 2 tabelas escritas por `salvar()`, que
-valida o contrato antes de gravar: a chave declarada no `CATALOGO` precisa existir, ser única e
-não ter nulo — mesma função e mesmo contrato das camadas bronze e silver.
+Saída de `notebooks/model_training.ipynb` (§11). São 3 tabelas escritas por `salvar()`, que valida
+o contrato antes de gravar: a chave declarada no `CATALOGO` precisa existir, ser única e não ter
+nulo — mesma função e mesmo contrato das camadas bronze e silver.
 
 **Formato de todos os arquivos:** CSV, separador `;`, encoding `utf-8-sig`, sem índice.
 Colunas de data são strings ISO `YYYY-MM-DD` (sem hora, sem fuso).
@@ -13,192 +13,239 @@ Colunas de data são strings ISO `YYYY-MM-DD` (sem hora, sem fuso).
 
 | Arquivo | Grão / chave | Linhas × colunas | Para quê |
 |---|---|---|---|
-| [`g_previsoes`](#g_previsoescsv) | data × prioridade × tipo_tratamento × horizonte × em_treino | 3.879 × 7 | O número previsto, dia a dia, pelo modelo vencedor de cada série |
-| [`g_avaliacao_modelos`](#g_avaliacao_modeloscsv) | prioridade × tipo_tratamento × horizonte × modelo × escopo | 45 × 17 | Quanto cada candidato errou, contra o piso, e qual venceu |
+| [`g_previsoes`](#g_previsoescsv) | data × prioridade × tipo_tratamento × horizonte × modelo | 1.200 × 9 | Toda previsão de teste, de **todos** os modelos, contra o valor real |
+| [`g_avaliacao_modelos`](#g_avaliacao_modeloscsv) | tipo_tratamento × prioridade × horizonte × modelo | 120 × 14 | Quanto cada modelo errou (geral e por prioridade), contra o piso ingênuo, e qual foi escolhido |
+| [`g_comparacao_grao`](#g_comparacao_graocsv) | horizonte × prioridade | 8 × 12 | Separar por tipo compensa? Soma de 2 modelos × modelo único sobre o total |
 
 ---
 
-## Convenções que atravessam as duas tabelas
+## O desenho por trás das três tabelas
 
-**As 6 séries.** Todo o conteúdo desta camada é organizado pelas mesmas 6 séries alvo da silver:
-prioridade (2, 3, 4) × `tipo_tratamento` (`com_intervencao`, `sem_intervencao`). Formato longo,
-como nas camadas anteriores — série é linha, nunca coluna.
+### 9 séries em 3 grupos
 
-**Janela de treino/teste.** Regra literal do enunciado, aplicada igual às três prioridades dentro
-de cada tipo:
+O grão é `prioridade × tipo_tratamento`, e a coluna `tipo_tratamento` tem **três** valores nesta
+camada — dois vindos do dado e um construído:
 
-| `tipo_tratamento` | Janela | Dias |
-|---|---|---|
-| `com_intervencao` | 2025-01-01 a 2025-12-31 | 365 |
-| `sem_intervencao` | 2025-09-01 a 2025-12-31 | 122 |
-
-As quebras estruturais finas identificadas na exploração (P3 `com_intervencao` em 25/10; o
-breakpoint de `sem_intervencao` em 31/08–01/09) são **conscientemente ignoradas** — decisão de
-negócio para manter a regra simples, não omissão. O custo dessa decisão está quantificado nas
-linhas `sem_intervencao` de `g_avaliacao_modelos`.
-
-**Validação.** Rolling-origin (`TimeSeriesSplit`, `gap=1`, sem shuffle), com o tamanho do teste
-fixo por dobra:
-
-| `tipo_tratamento` | Dobras | Teste por dobra | Treino (1ª → última dobra) | Dias avaliados por série |
+| Grupo | O que é | Janela | Dias | Teste |
 |---|---|---|---|---|
-| `com_intervencao` | 6 | 40 dias | 124 → 324 dias | 240 |
-| `sem_intervencao` | 4 | 15 dias | 61 → 106 dias | 60 |
+| `com_intervencao` | Incidentes que exigiram trabalho humano | 2025-01-01 → 2025-12-31 | 365 | 2025-12-11 → 2025-12-31 (21 d, 3 semanas) |
+| `sem_intervencao` | Incidentes que fecharam sozinhos via monitoramento | 2025-09-01 → 2025-12-31 | 122 | 2025-12-18 → 2025-12-31 (14 d, 2 semanas) |
+| `total` | **Soma dos dois**, sem o grão de tipo | 2025-09-01 → 2025-12-31 | 122 | 2025-12-18 → 2025-12-31 (14 d, 2 semanas) |
 
-**Horizontes.** `D+1` é o modelo. `D+7` é o **mesmo modelo aplicado recursivamente** sete vezes,
-realimentando a própria previsão — não existe modelo direto de D+7 nem cadeia por passo. O erro
-dos dois é reportado em linhas separadas, nunca somado.
+`total` não é uma terceira categoria do dado — é `com_intervencao + sem_intervencao` agregado por
+`data × prioridade`. Ele existe para responder uma pergunta de desenho: **separar por tipo valeu a
+pena?** Fica restrito aos mesmos 122 dias de propósito; com os 365 dias de `com_intervencao` um
+eventual ganho viria da janela maior, não do grão, e a comparação não responderia nada.
 
-**Features.** Conjunto fechado de 19 colunas, restrito pelo desenho recursivo: 11 de calendário e
-8 de lag/janela móvel do próprio alvo (`lag_1`, `lag_2`, `lag_3`, `lag_7`, `lag_14`, `media_7d`,
-`media_14d`, `media_30d`). No modelo `pooled` somam-se 3 indicadoras de prioridade. **Nenhuma
-feature exógena** (IC, template, equipe, backlog, outra prioridade) entra: todas são medidas do
-mesmo dia que o alvo e não são conhecidas em D+3 sem serem elas próprias previstas.
+**Split único e cronológico**, sem embaralhamento e sem validação cruzada em várias dobras: o
+teste é sempre a fatia mais recente. Cada modelo é ajustado uma vez por série.
 
-**Baselines de referência.** Quatro, medidos exatamente nas mesmas datas que os modelos: ingênuo
-(`abertos[O]`), sazonal lag-7 (`abertos[D−7]`), MM7 e MM30 (médias dos 7 e 30 dias até a origem
-`O = D − h`). Em h = 7 o ingênuo e o sazonal lag-7 coincidem por definição.
+### Os modelos
+
+| Modelo | O que é | Entrada | Complexidade |
+|---|---|---|---|
+| `ARIMA` | Autorregressivo + média móvel sobre a série diferenciada | Só o histórico de `abertos` | 1 |
+| `SARIMA` | ARIMA + bloco sazonal de período 7 + feriados como exógena | `abertos` + `feriado`, `vespera_feriado`, `pos_feriado` | 2 |
+| `Prophet` | Modelo aditivo de curva: tendência + sazonalidade de Fourier + feriados | `ds`/`y`, sazonalidade semanal, tabela de feriados do projeto, `vespera_feriado` e `pos_feriado` como regressores | 3 |
+| `LSTM` | Rede recorrente sobre janela de 14 dias | `log1p(abertos)` padronizado + 11 features de calendário por dia da janela + calendário do dia previsto | 4 |
+| `Ingênuo` | A previsão de amanhã é o valor de hoje | `abertos` do dia de origem | — (piso, não candidato) |
+
+Ordens de ARIMA/SARIMA escolhidas por **AIC** dentro do treino; `d` vem do teste ADF (resultou 0
+nas 9 séries). O SARIMA venceu o ARIMA em AIC nas 9 séries.
+
+**Nenhuma feature exógena entra** além do calendário. A restrição vem da recursão do D+7: para
+prever D+2 o modelo precisaria do valor da exógena em D+1, que ainda não aconteceu. O custo dessa
+restrição foi **medido, não assumido** — ver a nota sobre o estudo de features abaixo.
+
+### Horizontes
+
+`D+1` e `D+7` saem do **mesmo caminho de 7 passos** gerado a partir de cada dia de origem, o que
+impede que os dois divirjam por acidente de implementação:
+
+- **D+1** = primeiro passo do caminho. O modelo vê dado **real** até o dia de origem — legítimo,
+  porque em produção o valor de hoje já é conhecido ao prever amanhã.
+- **D+7** = **soma dos sete passos**, com a cadeia realimentando a própria previsão (o valor
+  previsto de D+1 ocupa o lugar do real ao prever D+2, e assim por diante). Responde "quanto
+  volume vem nesta semana", não "qual o valor do sétimo dia". Conferido contra
+  `y_abertos_acum_1a7` da silver, com divergência 0.
+
+O ARIMA/SARIMA andam pelo teste com os **parâmetros congelados**, refiltrando o estado com o dado
+real até cada origem. O Prophet é **reajustado em cada origem** — ele não é autorregressivo e não
+tem estado a atualizar, e sem o reajuste a comparação seria uma extrapolação de 3 semanas contra
+modelos que enxergam o dia anterior. O LSTM é treinado uma vez e desliza a janela de entrada.
+
+### O resultado, sem maquiagem
+
+| Grupo | Horizonte | Vencedor | MAE | MASE | MAE do ingênuo | Supera o ingênuo? |
+|---|---|---|---|---|---|---|
+| `com_intervencao` | D+1 | SARIMA | 16,27 | 0,99 | **13,49** | ❌ −20,6 % |
+| `com_intervencao` | D+7 | LSTM | **86,52** | 0,70 | 100,33 | ✅ +13,8 % |
+| `sem_intervencao` | D+1 | SARIMA | 102,74 | 1,88 | **65,02** | ❌ −58,0 % |
+| `sem_intervencao` | D+7 | SARIMA | 786,19 | 2,31 | **635,04** | ❌ −23,8 % |
+| `total` | D+1 | ARIMA | 114,09 | 1,73 | **68,52** | ❌ −66,5 % |
+| `total` | D+7 | ARIMA | 855,78 | 1,99 | **662,58** | ❌ −29,2 % |
+
+**Apenas 1 de 6 vencedores supera o baseline ingênuo** — `com_intervencao` em D+7, com o LSTM.
+Nos outros 5 casos o modelo escolhido erra mais do que simplesmente repetir o último valor
+observado.
+
+Isso não é falha de pipeline, é resultado. A decomposição STL mostra que o **resíduo responde por
+58 % da média do nível** nas 9 séries; numa série assim, o ingênuo é forte porque se reancora todo
+dia no nível corrente, enquanto um modelo ajustado numa janela fixa carrega o nível médio do
+treino. **Recomendação de negócio: não colocar em produção um modelo que perde para o ingênuo** —
+usar o próprio ingênuo como referência operacional enquanto não houver feature nova.
+
+A tabela `g_avaliacao_modelos` guarda os 4 candidatos lado a lado com o ingênuo, para que essa
+conclusão seja auditável, não uma alegação.
+
+### O estudo de features (§4–§5 do notebook, não vira tabela gold)
+
+93 features de 5 tabelas silver passaram por um XGBoost com importância medida por permutação no
+teste. Dois achados que contextualizam as escolhas acima:
+
+1. O ranking é liderado por **fluxo de fechamento / backlog** (31 % da importância), acima do
+   passado da própria série (20 %). Um **teste de ablação** quantificou o que isso vale: remover
+   as 64 exógenas e ficar só com as 29 que sobrevivem à recursão do D+7 custa **+13,1 % de MAE**.
+2. Mas nem com todas as 93 features o modelo chega ao piso — o XGBoost completo **perde para o
+   ingênuo por 24 %**. A parcela estocástica continua sem explicação dentro do que a base oferece
+   hoje, e isso é o que limita o teto de todos os modelos desta camada.
 
 ---
 
 # g_previsoes.csv
 
-**Grão:** `data × prioridade × tipo_tratamento × horizonte × em_treino` ·
-**Chave:** as 5 colunas acima · **3.879 linhas × 7 colunas**.
+**Grão:** `data × prioridade × tipo_tratamento × horizonte × modelo` · **Chave:** as 5 colunas ·
+**1.200 linhas × 9 colunas**.
 
-A previsão do **modelo vencedor** de cada série — só dele. As previsões dos candidatos perdedores
-ficam fora: o que se avalia deles está em `g_avaliacao_modelos`.
-
-> **Por que `em_treino` está na chave.** O grão pedido no handoff é
-> `data × prioridade × tipo_tratamento × horizonte`, mas a mesma data aparece duas vezes quando se
-> guarda tanto a previsão out-of-fold quanto a in-sample do modelo final — que é o que a própria
-> coluna `em_treino` existe para distinguir. Sem ela na chave as duas linhas colidiriam e
-> `salvar()` recusaria a gravação.
+Guarda a previsão de **todos os modelos**, não só do vencedor — é o que torna §8 e §9 do notebook
+auditáveis a partir do arquivo, sem reexecutar nada.
 
 ### Chave
 
 | Coluna | Tipo | Nulo | Domínio |
 |---|---|---|---|
-| `data` | date | 0 % | Dia **previsto** (data-alvo, não a origem da previsão). Dentro da janela da série |
+| `data` | date | 0 % | D+1: dia **previsto** (data-alvo). D+7: dia de **origem** (a semana prevista é `data+1` a `data+7`) |
 | `prioridade` | int | 0 % | 2, 3, 4 |
-| `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao` |
+| `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao`, `total` |
 | `horizonte` | str | 0 % | `D+1`, `D+7` |
-| `em_treino` | bool | 0 % | Ver abaixo |
+| `modelo` | str | 0 % | `ARIMA`, `SARIMA`, `Prophet`, `LSTM`, `Ingênuo` |
 
 ### Conteúdo
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `modelo` | str | 0 % | Nome do modelo que gerou a previsão. `GLM Poisson`, `Gradient Boosting`, `MLP` ou `Baseline <nome>` |
-| `valor_previsto` | float | 0 % | Previsão de `abertos` para `data`, arredondada em 2 casas. Nunca negativa — o corte em zero faz parte da definição do preditor |
+| `em_teste` | bool | 0 % | Sempre `True` — só previsões out-of-sample entram, nenhuma linha in-sample |
+| `escolhido` | bool | 0 % | `True` se este modelo é o vencedor do seu grupo × horizonte (§9) |
+| `valor_previsto` | float | 0 % | D+1: previsão de `abertos` para `data`. D+7: soma das 7 previsões recursivas. Nunca negativo, arredondado em 2 casas |
+| `valor_real` | float | 0 % | D+1: `abertos` real em `data`. D+7: soma real de `abertos` em `data+1`…`data+7` (`y_abertos_acum_1a7`) |
 
-### `em_treino` — a coluna que diz o quanto confiar na linha
+### Cobertura
 
-| Valor | O que é | Para que serve |
-|---|---|---|
-| `False` | Previsão **out-of-fold**: o dia não participou do ajuste do modelo que o previu | É a única honesta para medir erro. Toda métrica de `g_avaliacao_modelos` vem daqui |
-| `True` | Previsão **in-sample** do modelo final, reajustado em toda a janela | Cobre a janela inteira, serve para inspeção visual e para reconstruir a série ajustada. **Não usar para medir erro** |
+| Grupo | Origens D+1 | Linhas D+1 (3 prioridades × 5 modelos) | Origens D+7 | Linhas D+7 |
+|---|---|---|---|---|
+| `com_intervencao` | 21 | 315 | 15 | 225 |
+| `sem_intervencao` | 14 | 210 | 8 | 120 |
+| `total` | 14 | 210 | 8 | 120 |
 
-### Cobertura por série
-
-| Série | Vencedor | D+1 OOF | D+1 in-sample | D+7 OOF | D+7 in-sample |
-|---|---|---|---|---|---|
-| P2 `com_intervencao` | GLM Poisson (pooled) | 240 | 365 | 210 | 358 |
-| P3 `com_intervencao` | Gradient Boosting (pooled) | 240 | 365 | 210 | 358 |
-| P4 `com_intervencao` | GLM Poisson (individual) | 240 | 365 | 210 | 358 |
-| P2 `sem_intervencao` | Baseline MM30 | 60 | — | 60 | — |
-| P3 `sem_intervencao` | Baseline ingênuo | 60 | — | 60 | — |
-| P4 `sem_intervencao` | Baseline ingênuo | 60 | — | 60 | — |
-
-Três leituras de cobertura que evitam conclusão errada:
-
-- **As linhas OOF não cobrem a janela inteira.** Os primeiros dias de cada janela nunca são teste
-  de dobra nenhuma — é assim que rolling-origin funciona. Quem cobre a janela inteira são as
-  linhas `em_treino=True`.
-- **O D+7 tem menos linhas OOF que o D+1** (210 contra 240). Uma previsão de sete passos feita na
-  origem `O` só é legítima se o modelo tiver sido treinado apenas com dados até `O`; as datas-alvo
-  cuja origem cairia dentro do treino foram descartadas em vez de aceitas com vazamento.
-- **Séries com vencedor-baseline não têm linha `em_treino=True`.** Baseline não tem ajuste: para
-  ele, in-sample e out-of-fold seriam a mesma conta.
+O D+7 tem menos origens porque cada uma precisa de 7 dias reais **depois** dela para ter valor de
+comparação — as últimas 6 origens do teste não têm.
 
 ---
 
 # g_avaliacao_modelos.csv
 
-**Grão:** `prioridade × tipo_tratamento × horizonte × modelo × escopo` ·
-**Chave:** as 5 colunas acima · **45 linhas × 17 colunas**.
+**Grão:** `tipo_tratamento × prioridade × horizonte × modelo` · **Chave:** as 4 colunas ·
+**120 linhas × 14 colunas** (3 grupos × 4 níveis de prioridade × 2 horizontes × 5 modelos).
 
-Todos os candidatos avaliados, não só os vencedores. São 36 linhas de D+1 (6 séries × 3 modelos ×
-2 escopos), 3 linhas de D+1 dos baselines que venceram a própria série, e 6 linhas de D+7 — uma
-por série, porque o D+7 é gerado exclusivamente pelo vencedor de D+1.
+`prioridade = "todas"` é a leitura **geral** (as 3 prioridades juntas), que é a que decide o
+vencedor; as linhas `2`, `3`, `4` são o mesmo modelo fatiado por prioridade.
 
 ### Chave
 
 | Coluna | Tipo | Nulo | Domínio |
 |---|---|---|---|
-| `prioridade` | int | 0 % | 2, 3, 4 |
-| `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao` |
+| `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao`, `total` |
+| `prioridade` | str | 0 % | `"todas"` (geral) ou `"2"`, `"3"`, `"4"` |
 | `horizonte` | str | 0 % | `D+1`, `D+7` |
-| `modelo` | str | 0 % | `GLM Poisson`, `Gradient Boosting`, `MLP`, `Baseline MM30`, `Baseline ingênuo` |
-| `escopo` | str | 0 % | `pooled`, `individual`, `baseline` |
+| `modelo` | str | 0 % | `ARIMA`, `SARIMA`, `Prophet`, `LSTM`, `Ingênuo` |
 
-### `escopo` — a resposta ao Objetivo 1
-
-| Valor | O que é |
-|---|---|
-| `pooled` | Um modelo por `tipo_tratamento`, treinado nas 3 prioridades juntas, com a prioridade entrando como indicadora |
-| `individual` | Um modelo por série |
-| `baseline` | Não é modelo aprendido: é o melhor baseline da série, promovido a entregável porque nenhum candidato superou o piso |
-
-### Métricas (todas na validação out-of-fold)
+### Métricas
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `mae` | float | 0 % | Erro absoluto médio, em incidentes/dia. **É a métrica de decisão** |
-| `rmse` | float | 0 % | Raiz do erro quadrático médio. Penaliza o pico isolado, que é o que separa P2 das demais |
-| `mape` | float | 0 % | Erro percentual absoluto médio, com `max(y, 1)` no denominador para não estourar em dia de volume baixo |
-| `melhor_baseline` | float | 0 % | MAE do melhor baseline da mesma série e horizonte — o piso |
-| `supera_baseline` | bool | 0 % | `mae < melhor_baseline`. **Sempre `False` nas linhas de `escopo = baseline`**: um baseline não supera a si mesmo |
+| `n` | int | 0 % | Pontos de teste avaliados |
+| `mae` | float | 0 % | Erro absoluto médio, em incidentes/dia (D+1) ou incidentes/semana (D+7). **É a métrica de decisão** |
+| `rmse` | float | 0 % | Raiz do erro quadrático médio |
+| `mase` | float | 0 % | MAE ÷ erro da **mesma regra ingênua aplicada no treino**. Escala-livre: **< 1 = erra menos que o ingênuo cometia no treino**. É a métrica comparável **entre** séries |
+| `mape` | float | 0 % | Erro percentual absoluto, com `max(y, 1)` no denominador. ⚠️ **Quebra nas séries de contagem baixa** (`com_intervencao` P4 tem dias com 0 e 1): valores de centenas de % são artefato do denominador, não erro real. Preferir `mase` |
+| `mae_ingenuo` | float | 0 % | MAE do baseline ingênuo na mesma leitura, horizonte e datas — o piso |
+| `ganho_vs_ingenuo` | float | 0 % | `(1 − mae/mae_ingenuo) × 100`. Negativo = perde para o ingênuo |
+| `supera_ingenuo` | bool | 0 % | `mae < mae_ingenuo`. Sempre `False` nas linhas do próprio ingênuo |
 
-### Contexto do ajuste
+`mase` e `ganho_vs_ingenuo` medem coisas próximas mas não idênticas: o `mase` compara com o
+ingênuo **no treino** (referência estável), o `ganho_vs_ingenuo` com o ingênuo **no teste**
+(mesmas datas). Divergência entre os dois é informação — significa que o período de teste foi mais
+fácil ou mais difícil que o treino para uma previsão ingênua.
+
+### Escolha
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `janela_treino_inicio` | date | 0 % | `2025-01-01` (com) / `2025-09-01` (sem) |
-| `janela_treino_fim` | date | 0 % | `2025-12-31` nos dois |
-| `n_treino` | int | 0 % | Dias de treino por série, média entre as dobras. `0` nas linhas de baseline, que não treinam |
-| `n_teste` | int | 0 % | Linhas efetivamente avaliadas. 240 (D+1 com) · 210 (D+7 com) · 60 (sem) |
+| `complexidade` | int | 0 % | 1 = ARIMA, 2 = SARIMA, 3 = Prophet, 4 = LSTM, 0 = ingênuo. É o critério de desempate |
+| `escolhido` | bool | 0 % | Vencedor do grupo × horizonte. Uma linha `True` por combinação, sempre em `prioridade = "todas"` |
 
-### Escolha e explicabilidade
+**Regra de escolha**, nesta ordem: (1) candidatos são os 4 modelos — o ingênuo **não concorre**;
+(2) menor MAE na leitura geral; (3) empate técnico (diferença de MAE < 5 %) resolvido pelo **menos
+complexo**; (4) se o vencedor perder para o ingênuo, isso é **registrado com destaque** e a
+escolha se mantém, mas a leitura de negócio muda.
+
+O passo (3) foi acionado em 2 dos 6 casos: `com_intervencao` D+1 (SARIMA no lugar do LSTM) e
+`total` D+1 (ARIMA no lugar do SARIMA).
+
+---
+
+# g_comparacao_grao.csv
+
+**Grão:** `horizonte × prioridade` · **Chave:** as 2 colunas · **8 linhas × 12 colunas**.
+
+Responde à pergunta de desenho: para prever a **volumetria total** de uma prioridade, é melhor
+somar dois modelos por tipo, ou treinar um modelo só sobre o total?
+
+Os dois lados são medidos **nas mesmas datas** (2025-12-18 a 2025-12-31, a interseção das janelas
+de teste) e contra o **mesmo valor real** — o notebook asserta que `real_com + real_sem` é idêntico
+ao real do grupo `total`. Cada lado usa o modelo vencedor do seu próprio grupo.
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `escolhido` | bool | 0 % | Vencedor da série/horizonte. Exatamente uma linha `True` por combinação série × horizonte |
-| `top_features` | str | 0 % (`""` fora do vencedor) | As 5 features de maior importância por permutação, separadas por ` · ` |
-| `fonte_principal` | str | 0 % (`""` fora do vencedor) | Categoria que soma mais importância: `calendário`, `lag-rolling do alvo`, `dimensão da série` ou `exógeno-congelado` (esta última sempre vazia — nenhuma exógena foi admitida) |
+| `horizonte` | str | 0 % | `D+1`, `D+7` |
+| `prioridade` | str | 0 % | `"todas"` (geral) ou `"2"`, `"3"`, `"4"` |
+| `n` | int | 0 % | Pontos comparáveis (42 e 24 na leitura geral; 14 e 8 por prioridade) |
+| `mae_soma_2_modelos` | float | 0 % | MAE de `previsto_com + previsto_sem` contra o real total |
+| `mape_soma_2_modelos` | float | 0 % | MAPE da mesma soma |
+| `mae_modelo_unico` | float | 0 % | MAE do modelo treinado sobre o total, sem o grão de tipo |
+| `mape_modelo_unico` | float | 0 % | MAPE do modelo único |
+| `vantagem_da_separacao` | float | 0 % | `(1 − mae_soma/mae_unico) × 100`. **Positivo = separar por tipo é melhor** |
+| `modelo_com_intervencao` | str | 0 % | Vencedor usado no lado `com_intervencao` |
+| `modelo_sem_intervencao` | str | 0 % | Vencedor usado no lado `sem_intervencao` |
+| `modelo_total` | str | 0 % | Vencedor usado no lado do modelo único |
+| `separacao_vence` | bool | 0 % | `vantagem_da_separacao > 0` |
 
-**Regra de escolha do vencedor**, aplicada nesta ordem: (1) descartar quem não supera o piso;
-(2) menor MAE; (3) em empate técnico — diferença de MAE menor que 2 % — o mais simples, com GLM
-antes de Gradient Boosting antes de MLP, e `pooled` antes de `individual`. Quando nenhum candidato
-sobrevive ao passo (1), o vencedor é o próprio baseline.
+### O resultado
 
-### O resultado, resumido
+| Horizonte | Soma de 2 modelos | Modelo único | Vantagem da separação |
+|---|---|---|---|
+| D+1 (geral) | **101,17** | 114,09 | **+11,3 %** |
+| D+7 (geral) | **729,57** | 855,78 | **+14,7 %** |
 
-| Série | Vencedor D+1 | MAE | Piso | Ganho | MAE D+7 | Supera piso em D+7? |
-|---|---|---|---|---|---|---|
-| P2 `com_intervencao` | GLM Poisson · pooled | 15,95 | 17,55 | +9,1 % | 14,57 | sim |
-| P3 `com_intervencao` | Gradient Boosting · pooled | 15,35 | 17,29 | +11,2 % | 19,64 | **não** |
-| P4 `com_intervencao` | GLM Poisson · individual | 7,56 | 8,43 | +10,3 % | 7,62 | sim |
-| P2 `sem_intervencao` | Baseline MM30 | 36,54 | 36,54 | — | 36,07 | — |
-| P3 `sem_intervencao` | Baseline ingênuo | 51,25 | 51,25 | — | 81,55 | — |
-| P4 `sem_intervencao` | Baseline ingênuo | 51,82 | 51,82 | — | 79,25 | — |
+**Nos dois horizontes a separação por tipo compensa.** As duas séries têm dinâmicas diferentes o
+bastante para que modelá-las juntas custe acerto — a decisão de negócio de separar
+`com_intervencao` de `sem_intervencao` se sustenta também pelo lado da previsão, não só pelo lado
+da interpretação.
 
-Dois avisos para quem consumir esta tabela sem abrir o notebook:
+Uma exceção por prioridade: em **D+1 P4** o modelo único vence (−15,0 %), o único caso em que
+juntar sai melhor. Em D+7 a separação vence nas 3 prioridades, com margem grande em P2 (+56,6 %).
 
-1. **Metade das séries não tem modelo aprendido.** Nas três `sem_intervencao`, nenhum dos três
-   candidatos superou o piso — 122 dias de histórico contra uma mudança de patamar em dezembro. O
-   que a camada entrega para elas é o baseline, explicitamente marcado em `escopo`.
-2. **P3 `com_intervencao` vence em D+1 e perde em D+7.** O modelo depende de lag, e na recursão o
-   lag passa a ser a própria previsão: +28 % de MAE em sete passos. A linha de D+7 dessa série tem
-   `supera_baseline = False` e isso não é inconsistência com a linha de D+1 — é o custo do desenho
-   recursivo, medido.
+⚠️ **Ressalva de tamanho de amostra.** São 42 pontos em D+1 e 24 em D+7 — o que a interseção das
+janelas de teste permite. É indicativo, não conclusivo. Refazer com validação em várias origens
+(*rolling origin*) daria uma resposta mais firme, e está registrado como próximo passo no
+notebook.
