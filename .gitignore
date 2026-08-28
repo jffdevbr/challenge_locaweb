@@ -176,7 +176,20 @@ pyrightconfig.json
 # Arquivos de Dados
 0_raw_data/LW-DATASET-CSV.CSV
 1_bronze_data/b_incidentes.csv
-2_silver_data/s_temporal.csv
+2_silver_data/s_dim_calendario.csv
 2_silver_data/s_volume.csv
+2_silver_data/s_dim_ic_regime.csv
+2_silver_data/s_dim_ic.csv
+2_silver_data/s_dim_template.csv
+2_silver_data/s_dim_time_regime.csv
+2_silver_data/s_fato_diario_classe.csv
+2_silver_data/s_fato_diario_prioridade_turno.csv
+2_silver_data/s_fato_diario_prioridade.csv
+2_silver_data/s_fato_diario_time.csv
+2_silver_data/s_fato_diario.csv
+2_silver_data/s_fato_ola_prioridade.csv
+2_silver_data/s_ft_concentracao.csv
+2_silver_data/s_ft_ic.csv
+2_silver_data/s_tabela_modelo.csv
 
 # End of https://www.toptal.com/developers/gitignore/api/python
