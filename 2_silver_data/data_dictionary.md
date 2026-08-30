@@ -1,6 +1,6 @@
 # Dicionário de dados — Silver
 
-Saída da Seção 4 de `notebooks/data_exploration.ipynb`. São 14 tabelas escritas por `salvar()`,
+Saída da Seção 4 de `notebooks/data_exploration.ipynb`. São 17 tabelas escritas por `salvar()`,
 que valida o contrato antes de gravar: a chave declarada no `CATALOGO` precisa existir, ser única
 e não ter nulo.
 
@@ -13,20 +13,23 @@ Colunas de data são strings ISO `YYYY-MM-DD` (sem hora, sem fuso).
 
 | Arquivo | Grão / chave | Linhas × colunas | Para quê |
 |---|---|---|---|
-| [`s_fato_diario_prioridade`](#s_fato_diario_prioridadecsv) | data × prioridade × tipo_tratamento | 6.570 × 53 | **Tabela principal.** As 6 séries alvo, suas features e os alvos |
+| [`s_fato_diario_prioridade`](#s_fato_diario_prioridadecsv) | data × prioridade × tipo_tratamento | 6.570 × 56 | **Tabela principal.** As 6 séries alvo, suas features e os alvos |
 | [`s_fato_ola_prioridade`](#s_fato_ola_prioridadecsv) | data × prioridade | 3.285 × 9 | Acumulado anual e atingimento de OLA |
 | [`s_fato_diario_prioridade_turno`](#s_fato_diario_prioridade_turnocsv) | data × prioridade × tipo_tratamento × turno | 26.280 × 7 | Sazonalidade intradiária |
 | [`s_fato_diario`](#s_fato_diariocsv) | data | 1.095 × 43 | Contexto do dia + calendário |
-| [`s_fato_diario_time`](#s_fato_diario_timecsv) | data × time | 18.615 × 7 | Carga por grupo designado |
-| [`s_fato_diario_classe`](#s_fato_diario_classecsv) | data × classe_descricao | 12.045 × 7 | Volume por tipo de alerta |
+| [`s_fato_diario_time`](#s_fato_diario_timecsv) | data × time × tipo_tratamento | 37.230 × 8 | Carga por grupo designado |
+| [`s_fato_diario_classe`](#s_fato_diario_classecsv) | data × classe_descricao × tipo_tratamento | 24.090 × 8 | Volume por tipo de alerta |
 | [`s_ft_ic`](#s_ft_iccsv) | data | 1.095 × 14 | Features de item de configuração |
 | [`s_ft_concentracao`](#s_ft_concentracaocsv) | data | 1.095 × 4 | Concentração da carga entre times (HHI) |
-| [`s_dim_calendario`](#s_dim_calendariocsv) | data | 1.095 × 23 | Calendário e sazonalidade |
+| [`s_ft_concentracao_tipo`](#s_ft_concentracao_tipocsv) | data × tipo_tratamento | 2.190 × 5 | A mesma concentração, dentro de cada série |
+| [`s_ft_classe`](#s_ft_classecsv) | data × tipo_tratamento | 2.190 × 6 | Diversidade e concentração das classes de alerta |
+| [`s_ft_texto`](#s_ft_textocsv) | data × prioridade × tipo_tratamento | 6.570 × 14 | Frequency encoding de template de descrição e de time |
+| [`s_dim_calendario`](#s_dim_calendariocsv) | data | 1.460 × 23 | Calendário e sazonalidade — **1 ano além dos dados** |
 | [`s_dim_ic`](#s_dim_iccsv) | ic | 9.171 × 18 | Perfil consolidado do item de configuração |
 | [`s_dim_ic_regime`](#s_dim_ic_regimecsv) | ic × regime | 11.805 × 20 | Perfil do IC dentro de cada regime |
 | [`s_dim_time_regime`](#s_dim_time_regimecsv) | time × regime | 48 × 25 | Perfil do time dentro de cada regime |
 | [`s_dim_template`](#s_dim_templatecsv) | template_descricao | 13.317 × 22 | Perfil do template de alerta |
-| [`s_tabela_modelo`](#s_tabela_modelocsv) | data (formato largo) | 365 × 372 | Matriz pronta para modelagem |
+| [`s_tabela_modelo`](#s_tabela_modelocsv) | data (formato largo) | 365 × 392 | Matriz pronta para modelagem |
 
 ---
 
@@ -83,7 +86,7 @@ quem for modelar: as três séries `com_intervencao` dispõem de ~365 dias de hi
 # s_fato_diario_prioridade.csv
 
 **Grão:** `data × prioridade × tipo_tratamento` · **Chave:** `data + prioridade + tipo_tratamento`
-· **6.570 linhas × 53 colunas** (1.095 dias × 3 prioridades × 2 tipos).
+· **6.570 linhas × 56 colunas** (1.095 dias × 3 prioridades × 2 tipos).
 
 Tabela principal do projeto. Contém as 6 séries alvo, suas features de janela e os 3 alvos por
 série. Só prioridades 2, 3 e 4 — P1 e P5 são residuais e ficam em `s_fato_diario`.
@@ -144,6 +147,27 @@ séries só passam a ter fechamento diário a partir de 2025.
 | `taxa_monitoramento` | float | 71,9 % | `abertos_monitoramento / abertos × 100`. Nulo quando não houve abertura |
 | `regime` | int | 0 % | 1, 2 ou 3 (ver convenções) |
 | `backlog` | int | 0 % | Soma acumulada de `saldo_aberto_fechado` **dentro da série**. Pressão da fila |
+
+### Concentração do evento
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `inc_por_ic` | float | 71,9 % | `abertos / ics_distintos`. Incidentes por item de configuração |
+| `inc_por_descricao` | float | 71,9 % | `abertos / descricoes_distintas`. Repetição do mesmo texto no dia |
+| `inc_por_time` | float | 71,9 % | `abertos / times_distintos`. Carga média por time acionado |
+
+Separam o que a contagem bruta funde: 400 incidentes espalhados por 200 ICs é volume alto de
+operação normal; 400 incidentes em 3 ICs é um incidente sistêmico. As duas situações têm o mesmo
+`abertos`, e `ics_distintos` sozinho também não as distingue — só a razão.
+
+Numerador e denominador já estavam ambos na tabela. Explicitar a divisão não acrescenta dado
+nenhum: acrescenta uma **relação** que um modelo de árvore só aproximaria com muitos cortes, e
+que por isso ele tende a não encontrar sozinho. Medido em `model_training.ipynb` §5.7, as três
+juntas reduzem o MAE de teste em **4,8 %** — teste pareado em 30 sementes, `t = −5,4`, com ganho
+em 26 delas. É o único ganho estatisticamente sólido de todo o estudo de features.
+
+Nulas nos dias sem abertura, pelo mesmo motivo das demais razões: sem incidente, a razão é
+indefinida, e zero diria "o dia foi totalmente concentrado".
 
 ### Janelas móveis e defasagens
 
@@ -274,28 +298,40 @@ As 22 colunas de `s_dim_calendario` (menos `data`), unidas por `data`. Ver a se�
 
 # s_fato_diario_time.csv
 
-**Grão:** `data × time` · **18.615 linhas × 7 colunas** (1.095 × 17 times).
+**Grão:** `data × time × tipo_tratamento` · **37.230 linhas × 8 colunas** (1.095 × 17 times × 2 tipos).
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
 | `data` | date | 0 % | Chave |
 | `time` | str | 0 % | Grupo designado, 17 valores (`Team01`…`Team17`) |
-| `abertos` | int | 0 % | Incidentes do time no dia, todas as prioridades |
+| `tipo_tratamento` | str | 0 % | Chave — `com_intervencao` ou `sem_intervencao` |
+| `abertos` | int | 0 % | Incidentes do time no dia, **todas** as prioridades (inclusive P1 e P5) |
 | `abertos_p2` / `abertos_p3` / `abertos_p4` | int | 0 % | Recorte por prioridade |
 | `regime` | int | 0 % | 1, 2 ou 3 |
 
 `Team14` concentra 75,7 % da base inteira.
 
+**Por que `tipo_tratamento` está na chave.** Sem ele, uma feature de time seria o mesmo valor
+replicado nas duas séries de cada prioridade, e o modelo não teria como distinguir um dia em que
+o `Team14` dominou o que fechou sozinho de um dia em que ele dominou o que exigiu intervenção.
+
+**Escopo de `abertos`.** Soma todas as prioridades de propósito: é o denominador de
+`s_ft_concentracao`, e restringir a P2/P3/P4 deslocaria valores dessa tabela já consumidos a
+jusante. Quem precisa fechar com `s_fato_diario_prioridade` usa
+`abertos_p2 + abertos_p3 + abertos_p4` — conferido por assert no notebook.
+
 ---
 
 # s_fato_diario_classe.csv
 
-**Grão:** `data × classe_descricao` · **12.045 linhas × 7 colunas** (1.095 × 11 classes).
+**Grão:** `data × classe_descricao × tipo_tratamento` · **24.090 linhas × 8 colunas**
+(1.095 × 11 classes × 2 tipos).
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
 | `data` | date | 0 % | Chave |
 | `classe_descricao` | str | 0 % | Classe de negócio do alerta, ver domínio abaixo |
+| `tipo_tratamento` | str | 0 % | Chave — `com_intervencao` ou `sem_intervencao` |
 | `abertos` | int | 0 % | Abertos da classe no dia (**só P2, P3 e P4**) |
 | `abertos_p2` / `abertos_p3` / `abertos_p4` | int | 0 % | Recorte por prioridade |
 | `regime` | int | 0 % | 1, 2 ou 3 |
@@ -308,8 +344,14 @@ templates que cobrem 95 % do volume, mais o rótulo de cauda:
 
 `nao_rotulado` são os templates fora do escopo de 95 % — cauda longa, não falha de rotulagem.
 
-> Duas features derivadas desta tabela (`classes_ativas` e `entropia_classes`) não têm arquivo
-> próprio: aparecem apenas em `s_tabela_modelo`.
+As features derivadas desta tabela (`classes_ativas`, `entropia_classes`, `hhi_classes`,
+`share_classe_lider`) vivem em [`s_ft_classe`](#s_ft_classecsv); a versão no grão dia continua
+entrando em `s_tabela_modelo`.
+
+**Reprodutibilidade da rotulagem.** A classe vem de um LLM, que não é determinístico: reexecutar
+a rotulagem devolveria classes diferentes para parte dos templates e deslocaria em silêncio todas
+as features derivadas. Por isso o notebook lê o mapa `template_descricao → classe` já gravado em
+`s_dim_template.csv` e só chama a API para templates que ainda não estejam lá.
 
 ---
 
@@ -352,13 +394,112 @@ isso é sinal, não ruído.
 
 ---
 
-# s_dim_calendario.csv
+# s_ft_concentracao_tipo.csv
 
-**Grão:** `data` · **1.095 linhas × 23 colunas**.
+**Grão:** `data × tipo_tratamento` · **2.190 linhas × 5 colunas**.
+
+As mesmas três medidas de `s_ft_concentracao`, calculadas dentro de cada série em vez de sobre o
+dia inteiro. Colunas idênticas às da irmã, mais `tipo_tratamento` na chave.
+
+O HHI é sempre calculado sobre a distribuição entre os **17 times**: a tabela de origem chega no
+grão `data × time × tipo_tratamento` e é reagregada antes da conta. Sem esse passo o índice
+mediria a dispersão entre células time × tipo, que é outro número com o mesmo nome — o tipo de
+erro que não levanta exceção nenhuma.
+
+---
+
+# s_ft_classe.csv
+
+**Grão:** `data × tipo_tratamento` · **2.190 linhas × 6 colunas**.
+
+Espelho de `s_ft_concentracao_tipo` para as classes de alerta. A diversidade cai quando um único
+tipo de alerta domina o dia, que costuma ser a assinatura de um incidente sistêmico.
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `data` | date | 0 % | Chave, 2023-01-02 a 2025-12-31 |
+| `data` | date | 0 % | Chave |
+| `tipo_tratamento` | str | 0 % | Chave |
+| `classes_ativas` | int | 0 % | Classes com pelo menos um incidente. 0–11 |
+| `entropia_classes` | float | 0 % | Shannon normalizada (0–1) da distribuição de classes do dia |
+| `hhi_classes` | float | 0 % | Herfindahl-Hirschman sobre as participações das classes |
+| `share_classe_lider` | float | 0 % | Participação da classe mais volumosa, 0–1 |
+
+---
+
+# s_ft_texto.csv
+
+**Grão:** `data × prioridade × tipo_tratamento` · **6.570 linhas × 14 colunas**.
+
+*Frequency encoding* de `Descrição Resumida` (via template) e de `Grupo designado`. Responde uma
+pergunta que nenhuma outra feature da camada faz: **os incidentes de hoje são do tipo de sempre,
+ou é texto raro/inédito?** Dois dias com o mesmo `abertos` — um dominado por alertas repetidos,
+outro cheio de descrição nova — significam coisas opostas para a operação.
+
+O encoding é por frequência, e não one-hot, por cardinalidade: são 13.317 templates distintos.
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `data` / `prioridade` / `tipo_tratamento` | — | 0 % | Chave |
+| `incidentes` | int | 0 % | Incidentes na célula. Zero real quando não houve nenhum |
+| `freq_template_media` | float | ~72 % | Média, sobre os incidentes do dia, da frequência expansiva do template |
+| `freq_template_mediana` | float | ~72 % | Idem, mediana |
+| `freq_template_p10` | float | ~72 % | Idem, percentil 10 — lê a cauda rara do dia |
+| `pct_template_novo` | float | ~72 % | % dos incidentes cujo template nunca apareceu antes de D |
+| `templates_novos` | int | 0 % | Templates distintos inéditos no dia |
+| `freq_time_media` | float | ~72 % | Mesma lógica para o grupo designado |
+| `freq_time_min` | float | ~72 % | Frequência do time mais raro do dia |
+| `entropia_templates_dia` | float | ~72 % | Shannon normalizada da distribuição de templates |
+| `entropia_times_dia` | float | ~72 % | Shannon normalizada da distribuição de times |
+| `regime` | int | 0 % | 1, 2 ou 3 |
+
+### A frequência é expansiva, não global
+
+A frequência de um valor é sempre `n(valor em dias < D) / n(total em dias < D)` — contada
+**apenas sobre o passado**. A frequência global embutiria o futuro: um template que só nasce em
+outubro teria frequência alta em janeiro. É um vazamento que não aparece em validação nenhuma,
+porque a coluna continua preenchida e plausível.
+
+Sendo causal por construção, a tabela vale para **qualquer** corte de treino/teste — a camada
+silver não precisa conhecer as janelas definidas em `model_training.ipynb`, e um corte novo lá
+não obriga a regravar nada aqui.
+
+### Sobre os ~72 % de nulos
+
+São células sem incidente nenhum, quase todas em R1 (92,1 % das células de R1 são vazias, contra
+47,2 % em R2 e **0,7 % em R3**). Média de frequência e entropia de um dia vazio são indefinidas:
+preenchê-las com zero diria "os textos de hoje são raríssimos" e "o dia foi totalmente
+concentrado", que é o oposto do que um dia vazio significa. Ficam nulas — `incidentes == 0`
+distingue os dois casos, e o XGBoost trata nulo nativamente. Na janela efetivamente modelada
+(R3) o preenchimento é praticamente total.
+
+---
+
+# s_dim_calendario.csv
+
+**Grão:** `data` · **1.460 linhas × 23 colunas**.
+
+### A única tabela que vai além do fim dos dados
+
+Os dados terminam em 2025-12-31; esta tabela vai até **2026-12-31**, um ano à frente. São duas
+razões, e as duas são operacionais:
+
+1. **Prever D+1 exige o calendário do dia-alvo**, que por definição ainda não tem incidente.
+   SARIMA (exógenas de feriado), Prophet (regressores) e LSTM (as 11 features) todos dependem
+   disso. Com o calendário terminando junto com os dados, nenhum deles conseguiria prever o
+   próximo dia — é o que `exportar_modelos.py` e o serviço em `models/` consomem.
+2. **`vespera_feriado` é `feriado.shift(-1)`**, então no último dia da tabela ele vira 0 por
+   falta de dia seguinte. Sem a folga, 2025-12-31 aparecia como não-véspera — sendo que
+   2026-01-01 é Ano Novo. A extensão corrige esse valor, que cai dentro da janela de teste.
+
+O calendário é determinístico, então estender não é extrapolação: é só calcular. Todas as demais
+tabelas continuam limitadas ao período com dado, porque os merges de calendário têm sempre o fato
+à esquerda (`fato.merge(calendario, how="left")`) e as linhas futuras não vazam.
+
+O horizonte é `HORIZONTE_CALENDARIO` em `data_exploration.ipynb` §2.3.
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `data` | date | 0 % | Chave, 2023-01-02 a **2026-12-31** |
 | `nome_feriado` | str | 95,7 % | Nome do feriado, 16 distintos |
 | `escopo_feriado` | str | 95,7 % | `BR` nacional · `SP` municipal de São Paulo |
 | `feriado` | int | 0 % | 0/1 |
@@ -503,7 +644,7 @@ da base.
 
 # s_tabela_modelo.csv
 
-**Grão:** `data`, formato **largo** · **365 linhas × 372 colunas**.
+**Grão:** `data`, formato **largo** · **365 linhas × 392 colunas**.
 
 Matriz pronta para o estimador. É a única tabela em formato largo do projeto e a única restrita
 aos **regimes modeláveis (R2 e R3)** — daí as 365 linhas, de 2025-01-01 a 2025-12-31, em vez de
@@ -523,7 +664,7 @@ vez de virar `_x`/`_y` silenciosamente.
 
 ### Bloco 1 — as 6 séries: `p{2,3,4}_{com,sem}_intervencao_{métrica}`
 
-**294 colunas** = 49 métricas × 6 séries. As métricas são exatamente as colunas de
+**312 colunas** = 52 métricas × 6 séries. As métricas são exatamente as colunas de
 `s_fato_diario_prioridade` fora da chave e de `regime`:
 
 `abertos` · `abertos_monitoramento` · `abertos_manual` · `abertos_hor_comercial` ·
@@ -556,14 +697,14 @@ de OLA definida.
 
 ### Bloco 3 — grão dia: nome original
 
-**59 colunas**, sem prefixo:
+**61 colunas**, sem prefixo:
 
 | Origem | Colunas |
 |---|---|
 | `s_fato_diario` | 41 colunas (volumes totais, taxas, calendário, janelas de `abertos_total`), menos `data` e `regime` |
 | `s_ft_ic` | 13 colunas de item de configuração |
 | `s_ft_concentracao` | `hhi_times`, `times_com_incidente`, `share_time_lider` |
-| `ft_classe` | `classes_ativas` (classes de alerta com volume no dia) e `entropia_classes` (quão distribuído está o volume entre elas — cai quando um único tipo de alerta domina, padrão típico de incidente sistêmico) |
+| `s_ft_classe` (grão dia) | `classes_ativas`, `entropia_classes`, `hhi_classes`, `share_classe_lider` — quão distribuído está o volume entre as classes de alerta; cai quando um único tipo domina, padrão típico de incidente sistêmico |
 
 ### Nulos
 
