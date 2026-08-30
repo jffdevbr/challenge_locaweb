@@ -9,6 +9,9 @@ statsmodels==0.14.6
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 
+# Monitoramento (Azure Monitor / Application Insights) — ver api/main.py.
+azure-monitor-opentelemetry==1.6.4
+
 # Ausentes de propósito, e é o que segura a imagem: torch, prophet, cmdstanpy, xgboost,
 # scikit-learn, matplotlib. Nenhum modelo vencedor precisa deles — os 18 artefatos são todos
 # ARIMA/SARIMA do statsmodels.

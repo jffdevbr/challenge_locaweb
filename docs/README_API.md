@@ -182,6 +182,21 @@ próprio ingênuo como referência operacional nos demais.
 
 ---
 
+## Azure — monitoramento
+
+Instrumentação opcional do Application Insights, ligada só por variável de ambiente (sem ela a
+API sobe igual, como sempre subiu):
+
+| Variável | Para quê | Se ausente |
+|---|---|---|
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | connection string do Application Insights | telemetria desligada |
+
+Com a variável definida, `api/main.py` chama `configure_azure_monitor` no startup e passa a
+instrumentar FastAPI, logging e requisições automaticamente. O provisionamento dos recursos na
+Azure está em [`../azure/provisionar.sh`](../azure/provisionar.sh).
+
+---
+
 ## Testes
 
 ```bash

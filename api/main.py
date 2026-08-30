@@ -5,6 +5,8 @@ ingênuo, faixa de OLA estourada, P4 sem meta, extrapolação fora da janela) n�
 HTML: quem consumir a API por outro caminho precisa recebê-las junto com o número.
 """
 
+import logging
+import os
 import platform
 from contextlib import asynccontextmanager
 from datetime import date
@@ -22,6 +24,8 @@ from api import config as cfg
 from api import dominio as dom
 from api import ola as mod_ola
 from api import previsao as prev
+
+logger = logging.getLogger("api.main")
 
 DOMINIO = None
 MODELOS = None
@@ -47,6 +51,14 @@ app = FastAPI(
     version="1.0.0",
     lifespan=ciclo_de_vida,
 )
+
+# Application Insights — só instrumenta se a connection string vier por ambiente (deploy na
+# Azure). Local, sem a variável, a linha abaixo não faz nada; ver `azure/provisionar.sh`.
+if os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    from azure.monitor.opentelemetry import configure_azure_monitor
+
+    configure_azure_monitor(logger_name="api")
+    logger.info("Application Insights instrumentado.")
 
 
 # ==================================================================================================
