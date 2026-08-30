@@ -191,5 +191,12 @@ pyrightconfig.json
 2_silver_data/s_ft_concentracao.csv
 2_silver_data/s_ft_ic.csv
 2_silver_data/s_tabela_modelo.csv
+2_silver_data/s_ft_classe.csv
+2_silver_data/s_ft_concentracao_tipo.csv
+2_silver_data/s_ft_texto.csv
+3_gold_data/g_ablacao_exogenas.csv
+3_gold_data/g_avaliacao_modelos.csv
+3_gold_data/g_comparacao_grao.csv
+3_gold_data/g_previsoes.csv
 
 # End of https://www.toptal.com/developers/gitignore/api/python
