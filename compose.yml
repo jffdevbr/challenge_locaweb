@@ -1,0 +1,22 @@
+# Modo de desenvolvimento: o dado fica FORA da imagem, montado como somente-leitura. Retreinou no
+# notebook? Os .pkl novos entram no próximo `docker compose restart`, sem rebuild.
+#
+# Para a imagem autocontida de entrega (dado dentro), use o Dockerfile direto:
+#   docker build -t lw-previsao:1.0 .
+#   docker run --rm -p 8000:8000 lw-previsao:1.0
+services:
+  api:
+    build: .
+    image: lw-previsao:1.0
+    container_name: lw-previsao
+    ports:
+      - "8000:8000"
+    environment:
+      CAMINHO_MODELOS: /app/models
+      CAMINHO_SILVER: /app/2_silver_data
+      CAMINHO_GOLD: /app/3_gold_data
+    volumes:
+      - ./models:/app/models:ro
+      - ./2_silver_data:/app/2_silver_data:ro
+      - ./3_gold_data:/app/3_gold_data:ro
+    restart: unless-stopped

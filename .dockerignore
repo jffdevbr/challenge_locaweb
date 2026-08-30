@@ -1,0 +1,30 @@
+# É este arquivo que impede a imagem de estourar: sem ele o build mandaria .venv (centenas de MB)
+# e os notebooks (~8 MB) para o daemon antes de qualquer COPY.
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+.git/
+.github/
+.claude/
+
+notebooks/
+0_raw_data/
+1_bronze_data/
+
+# Das camadas servidas, o Dockerfile copia arquivo por arquivo — o resto fica de fora.
+2_silver_data/*
+!2_silver_data/s_fato_diario_prioridade.csv
+!2_silver_data/s_fato_diario_prioridade_turno.csv
+!2_silver_data/s_dim_calendario.csv
+!2_silver_data/s_fato_ola_prioridade.csv
+3_gold_data/*
+!3_gold_data/g_previsoes.csv
+!3_gold_data/g_avaliacao_modelos.csv
+
+tests/
+*.md
+!README_API.md

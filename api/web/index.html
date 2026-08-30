@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Previsão de incidentes — Locaweb</title>
+  <link rel="stylesheet" href="/static/estilo.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Previsão de incidentes — P2/P3/P4, D+1 e D+7</h1>
+    <p>Serving dos modelos vencedores, com a situação da data, o valor real quando existe, e a
+       leitura de risco de OLA, capacidade e dias atípicos.</p>
+  </header>
+
+  <main>
+    <div class="controles">
+      <div class="campo">
+        <label for="data">Data de origem</label>
+        <input type="date" id="data">
+        <span class="dica" id="dica-data"></span>
+      </div>
+      <div class="campo">
+        <label for="prioridade">Prioridade</label>
+        <select id="prioridade">
+          <option value="2">P2 — Alta</option>
+          <option value="3" selected>P3 — Média</option>
+          <option value="4">P4 — Baixa</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="horizonte">Horizonte</label>
+        <select id="horizonte">
+          <option value="D+1">D+1 — o dia seguinte</option>
+          <option value="D+7" selected>D+7 — a semana (acumulado)</option>
+        </select>
+      </div>
+      <button id="consultar">Consultar</button>
+      <button id="exemplo" class="secundario" title="15/12/2025, P3, D+7 — a data em que o painel de OLA se paga">Caso de demonstração</button>
+    </div>
+
+    <section id="bloco-entradas">
+      <h2>Entradas do dia</h2>
+      <div id="entradas"><p class="vazio">Escolha uma data e clique em Consultar.</p></div>
+    </section>
+
+    <section id="bloco-previsao">
+      <h2>Previsão · <span id="titulo-previsao">—</span></h2>
+      <div class="cards" id="cards"></div>
+      <div class="rolagem" style="margin-top:16px"><canvas id="grafico"></canvas></div>
+    </section>
+
+    <section id="bloco-avisos" hidden>
+      <h2>Ressalvas</h2>
+      <div class="avisos" id="avisos"></div>
+    </section>
+
+    <div class="linha-paineis">
+      <section>
+        <h2>Risco de cumprimento de OLA</h2>
+        <div id="ola"><p class="vazio">—</p></div>
+      </section>
+      <section>
+        <h2>Capacidade necessária</h2>
+        <div id="capacidade"><p class="vazio">—</p></div>
+      </section>
+    </div>
+
+    <section>
+      <h2>Dias atípicos — o real fora da banda</h2>
+      <div id="atipicos"><p class="vazio">—</p></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
