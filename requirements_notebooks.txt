@@ -1,0 +1,66 @@
+# Ambiente dos notebooks — reproduz `notebooks/data_validation.ipynb`, `data_exploration.ipynb` e
+# `model_training.ipynb`. Python 3.12.10.
+#
+# NÃO confundir com `requirements_api_container.txt`: aquele é o ambiente MÍNIMO de serving (só o
+# que a API precisa para desserializar os .pkl e responder HTTP). Este aqui é o ambiente de
+# PRODUÇÃO DO DADO — treina, plota, chama LLM e roda Spark.
+#
+# Tudo pinado com `==` a partir do `.venv` que gerou as camadas 1–3 e os 18 artefatos de `models/`.
+# Não é zelo: os .pkl são pickle de statsmodels, e as quatro primeiras linhas do bloco "núcleo"
+# precisam casar com `requirements_api_container.txt` — senão o que o notebook grava a API não
+# carrega. Ao subir qualquer uma delas, subir nos dois arquivos e retreinar.
+#
+# Instalação:
+#   ./.venv/Scripts/python.exe -m pip install -r requirements_notebooks.txt
+#
+# A pasta `notebooks/testes/` (versões antigas) NÃO está coberta por este arquivo.
+
+# `torch` só existe em roda +cpu no índice da própria PyTorch. Sem esta linha o pin abaixo não
+# resolve. Mantida no topo porque diretiva de índice vale para o arquivo inteiro.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# --- Núcleo — define a compatibilidade do pickle com a API ---------------------------------------
+numpy==2.0.2
+pandas==2.2.2
+scipy==1.16.3
+statsmodels==0.14.6
+scikit-learn==1.9.0
+
+# --- Gráficos ------------------------------------------------------------------------------------
+matplotlib==3.10.0
+seaborn==0.13.2
+plotly==5.24.1
+
+# --- data_exploration.ipynb ----------------------------------------------------------------------
+# `ruptures`: detecção de quebra estrutural (§3.1). `anthropic` + `python-dotenv`: rotulagem de
+# templates por LLM (§2.9) — a chave é OPCIONAL, o cache de `s_dim_template.csv` cobre o que já foi
+# rotulado e o notebook roda até o fim sem ela. `holidays`: calendário brasileiro.
+ruptures==1.1.10
+anthropic==1.0.0
+python-dotenv==1.2.3
+holidays==0.103
+
+# --- model_training.ipynb ------------------------------------------------------------------------
+# Prophet, LSTM (torch) e XGBoost são candidatos que o notebook TREINA e COMPARA. Nenhum venceu —
+# os 18 artefatos são todos ARIMA/SARIMA — e é por isso que o requirements do container não os
+# tem. Para reproduzir a comparação, porém, eles são obrigatórios.
+prophet==1.4.0
+cmdstanpy==1.3.0
+xgboost==3.4.1
+torch==2.13.0+cpu
+
+# --- data_validation.ipynb -----------------------------------------------------------------------
+# ⚠️ Este notebook roda em Spark e exige **Java 17+ no PATH** (`JAVA_HOME` configurado). É também a
+# única linha deste arquivo que NÃO foi verificada contra o `.venv` do projeto: a validação foi
+# executada em Colab/WSL, e o `.venv` local nunca teve pyspark instalado.
+pyspark==3.5.3
+pyarrow==18.1.0
+
+# --- Jupyter -------------------------------------------------------------------------------------
+ipykernel==7.3.0
+ipython==9.14.1
+nbformat==5.10.4
+tqdm==4.70.0
+
+# --- Testes (tests/, portão de qualidade da reprodução) ------------------------------------------
+pytest==9.1.1

@@ -5,7 +5,9 @@ recebem *data + prioridade + horizonte* e devolvem as features de entrada, a pre
 grupos, o valor real quando existe, e três painéis de negócio (risco de OLA, capacidade, dias
 atípicos).
 
-O contrato dos modelos está em [`docs/CONTRATO_MODELOS.md`](docs/CONTRATO_MODELOS.md).
+O contrato dos modelos está em [`docs/CONTRATO_MODELOS.md`](CONTRATO_MODELOS.md). A visão geral do
+projeto e o passo a passo que produz o dado que esta API lê estão no
+[`README.md`](../README.md) da raiz.
 
 ---
 
@@ -33,7 +35,7 @@ A imagem (~530 MB, dos quais ~19 MB de dado) roda em qualquer máquina sem prepa
 ### Sem container
 
 ```bash
-./.venv/Scripts/python.exe -m pip install -r requirements.txt
+./.venv/Scripts/python.exe -m pip install -r requirements_api_container.txt
 ./.venv/Scripts/python.exe -m uvicorn api.main:app --reload
 ```
 
@@ -63,7 +65,8 @@ contexto de build. Os caminhos são configuráveis por variável de ambiente —
 `CAMINHO_SILVER`, `CAMINHO_GOLD`.
 
 **Pins de versão não são zelo.** Os artefatos são pickle de statsmodels: a versão que desserializa
-precisa casar com a que serializou. `requirements.txt` fixa exatamente o ambiente de treino, e
+precisa casar com a que serializou. `requirements_api_container.txt` fixa exatamente o ambiente de
+treino (as mesmas versões de núcleo de `requirements_notebooks.txt`), e
 `/health` devolve as versões carregadas para que uma incompatibilidade apareça como diagnóstico e
 não como erro 500 no meio de uma demonstração.
 
