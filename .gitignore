@@ -199,4 +199,7 @@ pyrightconfig.json
 3_gold_data/g_comparacao_grao.csv
 3_gold_data/g_previsoes.csv
 
+# Arquivos .pkl
+*.pkl
+
 # End of https://www.toptal.com/developers/gitignore/api/python

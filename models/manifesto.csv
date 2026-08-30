@@ -1,0 +1,19 @@
+﻿arquivo;tipo_tratamento;prioridade;horizonte;modelo;serie_modelada;passos;ajustado_ate;corte_teste;n_treino;mae;mase;mae_ingenuo;ganho_vs_ingenuo;supera_ingenuo;regra_ingenua;configuracao;kb
+com_intervencao_P2_D1_SARIMA.pkl;com_intervencao;2;D+1;SARIMA;abertos;1;2025-11-19;2025-11-20;323;21.5466;1.2304;22.7857;5.44;True;último valor;order=(2, 0, 2) sazonal=(0, 0, 1, 7) exog=['feriado', 'vespera_feriado', 'pos_feriado'];2492.4
+com_intervencao_P3_D1_SARIMA.pkl;com_intervencao;3;D+1;SARIMA;abertos;1;2025-11-19;2025-11-20;323;17.1328;0.6087;17.5238;2.23;True;último valor;order=(2, 0, 0) sazonal=(1, 0, 1, 7) exog=['feriado', 'vespera_feriado', 'pos_feriado'];2093.5
+com_intervencao_P4_D1_SARIMA.pkl;com_intervencao;4;D+1;SARIMA;abertos;1;2025-11-19;2025-11-20;323;9.9599;1.025;7.2857;-36.7;False;último valor;order=(0, 0, 2) sazonal=(1, 0, 1, 7) exog=['feriado', 'vespera_feriado', 'pos_feriado'];2492.3
+com_intervencao_P2_D7_ARIMA.pkl;com_intervencao;2;D+7;ARIMA;soma7;7;2025-11-19;2025-11-20;323;69.1863;0.9073;148.8333;53.51;True;soma da última semana;order=(0, 0, 7) sazonal=(0, 0, 0, 0) exog=-;1688.4
+com_intervencao_P3_D7_ARIMA.pkl;com_intervencao;3;D+7;ARIMA;soma7;7;2025-11-19;2025-11-20;323;73.9349;0.9177;92.5833;20.14;True;soma da última semana;order=(3, 1, 7) sazonal=(0, 0, 0, 0) exog=-;1864.8
+com_intervencao_P4_D7_ARIMA.pkl;com_intervencao;4;D+7;ARIMA;soma7;7;2025-11-19;2025-11-20;323;31.4838;0.8845;34.2778;8.15;True;soma da última semana;order=(1, 1, 7) sazonal=(0, 0, 0, 0) exog=-;1864.3
+sem_intervencao_P2_D1_ARIMA.pkl;sem_intervencao;2;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;25.114;0.4834;27.9643;10.19;True;último valor;order=(0, 0, 3) sazonal=(0, 0, 0, 0) exog=-;199.5
+sem_intervencao_P3_D1_ARIMA.pkl;sem_intervencao;3;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;171.9912;3.0589;65.4286;-162.87;False;último valor;order=(0, 0, 3) sazonal=(0, 0, 0, 0) exog=-;199.5
+sem_intervencao_P4_D1_ARIMA.pkl;sem_intervencao;4;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;60.397;1.1009;69.0;12.47;True;último valor;order=(2, 0, 3) sazonal=(0, 0, 0, 0) exog=-;199.8
+sem_intervencao_P2_D7_ARIMA.pkl;sem_intervencao;2;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;95.7387;0.4216;100.2273;4.48;True;soma da última semana;order=(0, 1, 7) sazonal=(0, 0, 0, 0) exog=-;598.2
+sem_intervencao_P3_D7_ARIMA.pkl;sem_intervencao;3;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;1193.4089;4.5099;745.1364;-60.16;False;soma da última semana;order=(0, 1, 7) sazonal=(0, 0, 0, 0) exog=-;598.2
+sem_intervencao_P4_D7_ARIMA.pkl;sem_intervencao;4;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;400.2806;0.7759;531.2273;24.65;True;7 x abertos[D];order=(3, 1, 7) sazonal=(0, 0, 0, 0) exog=-;598.9
+total_P2_D1_ARIMA.pkl;total;2;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;42.8252;0.6259;36.5357;-17.21;False;último valor;order=(0, 0, 3) sazonal=(0, 0, 0, 0) exog=-;199.5
+total_P3_D1_ARIMA.pkl;total;3;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;147.2691;2.0717;71.4286;-106.18;False;último valor;order=(0, 0, 3) sazonal=(0, 0, 0, 0) exog=-;199.5
+total_P4_D1_ARIMA.pkl;total;4;D+1;ARIMA;abertos;1;2025-12-03;2025-12-04;94;56.5272;0.9936;69.6786;18.87;True;último valor;order=(3, 0, 3) sazonal=(0, 0, 0, 0) exog=-;200.0
+total_P2_D7_ARIMA.pkl;total;2;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;148.8088;0.4813;121.7273;-22.25;False;soma da última semana;order=(0, 1, 7) sazonal=(0, 0, 0, 0) exog=-;598.2
+total_P3_D7_ARIMA.pkl;total;3;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;1038.6049;3.3769;709.0909;-46.47;False;soma da última semana;order=(1, 1, 7) sazonal=(0, 0, 0, 0) exog=-;598.4
+total_P4_D7_ARIMA.pkl;total;4;D+7;ARIMA;soma7;7;2025-12-03;2025-12-04;94;479.9781;0.8923;558.0909;14.0;True;7 x abertos[D];order=(3, 0, 7) sazonal=(0, 0, 0, 0) exog=-;539.6
