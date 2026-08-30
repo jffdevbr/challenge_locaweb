@@ -12,8 +12,8 @@ ENV PYTHONUNBUFFERED=1 \
     CAMINHO_SILVER=/app/2_silver_data \
     CAMINHO_GOLD=/app/3_gold_data
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements_api_container.txt .
+RUN pip install --no-cache-dir -r requirements_api_container.txt
 
 COPY api/ ./api/
 
