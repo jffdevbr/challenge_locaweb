@@ -120,6 +120,43 @@ APPI_CONNECTION_STRING=$(az monitor app-insights component show \
    Log Analytics workspace from ARM`. Resolvido com `export MSYS_NO_PATHCONV=1` antes do comando —
    sem efeito em bash de verdade (Linux/macOS/WSL), só existe no Git Bash do Windows.
 
+### Telemetria não aparecia na UI — dois bugs por trás do silêncio
+
+Depois do primeiro deploy, `/health` e `/api/previsao` respondiam normalmente, mas nada aparecia
+em **Application Insights → Logs** nem em **Live Metrics**, sem nenhum erro óbvio. Dois problemas
+distintos, achados nessa ordem:
+
+1. **`azure-monitor-opentelemetry-exporter` (pacote do exportador, versionado à parte) recusa um
+   redirecionamento legítimo entre dois domínios da própria Azure Monitor.** O log do container
+   mostrava `Refusing cross-origin redirect to https://brazilsouth-1.in.applicationinsights.azure.com.`
+   — o Live Metrics fala primeiro com um endpoint global e é redirecionado pro regional; a
+   checagem de segurança do SDK (contra um `Location` header malicioso) exige que origem e destino
+   tenham exatamente o mesmo sufixo de domínio, e o par legítimo
+   `*.services.visualstudio.com → *.applicationinsights.azure.com` não bate nessa regra —
+   descartando a telemetria inteira, em silêncio, sem lançar exceção. Confirmado comparando o
+   código-fonte de várias versões do pacote (baixadas com `pip download --no-deps`): o bug entrou
+   entre a `1.0.0b50` e a `1.0.0b53`, e segue presente na última (`1.0.0b56`, a mesma que
+   `azure-monitor-opentelemetry==1.6.4` resolve por padrão). Corrigido fixando a versão do
+   exportador em `requirements_api_container.txt`:
+   ```
+   azure-monitor-opentelemetry==1.6.4
+   azure-monitor-opentelemetry-exporter==1.0.0b50
+   ```
+2. **Mesmo sem o bug acima, nenhuma requisição HTTP virava telemetria** — só chamadas manuais ao
+   tracer funcionavam (confirmado reproduzindo o envio localmente com `AzureMonitorTraceExporter`
+   direto, fora do container: a Azure aceitava — `Transmission succeeded: Items accepted`).
+   Causa: `opentelemetry-instrumentation-fastapi` instrumenta trocando a classe `fastapi.FastAPI`
+   por uma versão instrumentada (`fastapi.FastAPI = _InstrumentedFastAPI`) — só pega **apps
+   criados depois** dessa troca. Em `api/main.py`, `app = FastAPI(...)` já existia (via
+   `from fastapi import FastAPI`, que fixa o nome no import) antes de `configure_azure_monitor()`
+   rodar, então o `app` real nunca foi trocado pela versão instrumentada — nenhum request virava
+   span. Corrigido chamando `FastAPIInstrumentor.instrument_app(app)` explicitamente logo depois
+   de `configure_azure_monitor()`, instrumentando o objeto `app` já existente em vez de depender
+   da troca de classe.
+
+Depois dos dois fixes, rebuild + recriação do ACI, e `AppRequests` no Log Analytics passou a
+mostrar cada chamada real (200/404/422) com `Success` certo, poucos segundos depois da chamada.
+
 ---
 
 ## 4) Credenciais do ACR

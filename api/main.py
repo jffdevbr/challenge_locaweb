@@ -53,12 +53,19 @@ app = FastAPI(
 )
 
 # Application Insights — só instrumenta se a connection string vier por ambiente (deploy na
-# Azure). Local, sem a variável, a linha abaixo não faz nada; ver `azure/provisionar.sh`.
+# Azure). Local, sem a variável, o bloco abaixo não roda; ver `azure/provisionar.sh`.
+#
+# `configure_azure_monitor()` instrumenta FastAPI trocando a classe `fastapi.FastAPI` por uma
+# versão instrumentada — só pega apps criados DEPOIS dessa troca. Como `app` já existe (linha
+# acima, via `from fastapi import FastAPI`, que fixou o nome no import), essa troca automática
+# não alcança o nosso `app`: precisa do `FastAPIInstrumentor.instrument_app(app)` explícito.
 if os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
     from azure.monitor.opentelemetry import configure_azure_monitor
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     configure_azure_monitor(logger_name="api")
-    logger.info("Application Insights instrumentado.")
+    FastAPIInstrumentor.instrument_app(app)
+    logger.info("Application Insights instrumentado (com FastAPI).")
 
 
 # ==================================================================================================
