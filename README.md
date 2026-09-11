@@ -21,22 +21,30 @@ dimensionamento de capacidade e detecção de dias atípicos.
 
 ## O resultado, sem maquiagem
 
-**1 de 6 cortes supera o baseline ingênuo.** Isso está medido, documentado, exposto na tela ao lado
-de cada previsão e não é suavizado em lugar nenhum do projeto:
+A decisão do modelo passou a ser por **série** (`grupo × prioridade × horizonte`, 18 no total), não
+mais por `grupo × horizonte` agregado — escolher no agregado deixava a série de maior volume
+decidir sozinha por todo o grupo. **11 das 18 séries superam o baseline ingênuo**; no critério
+agregado anterior isso seria 2 de 6:
 
-| Grupo | Horizonte | Vencedor | MAE | MAE ingênuo | Supera o ingênuo? |
-|---|---|---|---|---|---|
-| `com_intervencao` | D+1 | SARIMA | 16,21 | 15,87 | ❌ −2,2 % |
-| `com_intervencao` | D+7 | ARIMA | **58,20** | 91,90 | ✅ **+36,7 %** |
-| `sem_intervencao` | D+1 | ARIMA | 85,83 | 54,13 | ❌ −58,6 % |
-| `sem_intervencao` | D+7 | ARIMA | 563,14 | 458,86 | ❌ −22,7 % |
-| `total` | D+1 | ARIMA | 82,21 | 59,21 | ❌ −38,8 % |
-| `total` | D+7 | ARIMA | 555,80 | 462,97 | ❌ −20,1 % |
+| Grupo | Horizonte | MAE agregado (3 prioridades) | MAE ingênuo | Ganho agregado |
+|---|---|---|---|---|
+| `com_intervencao` | D+1 | **14,70** | 15,87 | ✅ **+7,4 %** |
+| `com_intervencao` | D+7 | **63,84** | 91,90 | ✅ **+30,5 %** |
+| `sem_intervencao` | D+1 | 56,33 | **54,13** | ❌ −4,1 % |
+| `sem_intervencao` | D+7 | 548,97 | **458,86** | ❌ −19,6 % |
+| `total` | D+1 | 59,62 | **59,21** | ❌ −0,7 % |
+| `total` | D+7 | 521,75 | **462,97** | ❌ −12,7 % |
 
-Recomendação registrada: usar o modelo em produção onde ele ganha — hoje, `com_intervencao` em
-D+7 — e a própria regra ingênua como referência operacional nos demais. O detalhamento está em
+Recomendação registrada: usar em produção apenas o modelo que supera o ingênuo na sua série —
+hoje, 11 das 18 — e a própria regra ingênua como referência operacional nas outras 7,
+concentradas em P3 de `sem_intervencao`/`total`, cujo nível salta dentro da própria janela de
+teste (limitação de dado, não de modelo). O detalhamento por série está em
 [`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md) e em
 [`docs/CONTRATO_MODELOS.md`](docs/CONTRATO_MODELOS.md) §8.
+
+> ⚠️ **`api/` ainda serve o contrato anterior.** Esta safra introduziu `ETS` e `Theta` ao lado do
+> `SARIMAX`, e o serving (`api/previsao.py`) e o portão de qualidade (`tests/test_reproducao.py`)
+> não foram atualizados para eles — ver `docs/CONTRATO_MODELOS.md` §7.
 
 ---
 
@@ -59,19 +67,25 @@ Pipeline em camadas, cada seta é um notebook:
    2_silver_data/  (17 tabelas)           fatos diários e dimensões
         │                                 s_fato_diario_prioridade.csv é a base de tudo
         │
-        │  notebooks/model_training.ipynb       ARIMA · SARIMA · Prophet · LSTM · XGBoost,
-        │                                       split com embargo, escolha do vencedor
+        │  notebooks/model_training.ipynb       SARIMAX · ETS · Theta disputam por backtest de
+        │                                       origem móvel; Prophet · LSTM · XGBoost, referência
         ▼
-   3_gold_data/ (4 tabelas)  +  models/ (18 .pkl + manifesto.csv)
+   3_gold_data/ (4 tabelas)  +  models/ (18 artefatos .pkl/.json + manifesto.csv)
         │
         │  api/     FastAPI + página web — serving por apply(refit=False) + forecast
+        │           ⚠️ ainda só sabe carregar SARIMAX — ver docs/CONTRATO_MODELOS.md §7
         ▼
    http://localhost:8000
 ```
 
-Os três grupos × três prioridades × dois horizontes dão os **18 artefatos** de `models/`. Todos são
-`SARIMAXResults` do statsmodels: nesta safra nenhum Prophet e nenhum LSTM sobreviveu à escolha — e
-é por isso que o container de serving não precisa de `torch` nem de `prophet`.
+Os três grupos × três prioridades × dois horizontes dão os **18 artefatos** de `models/`, cada
+série com o seu próprio vencedor: **8 `SARIMAX`, 7 `Theta`, 3 `ETS`** nesta safra — os três disputam
+por um backtest de origem móvel dentro do treino, nunca pelo MAE do teste. Nenhum Prophet e nenhum
+LSTM foi escolhido; as duas famílias competem só como referência medida no hold-out, fora da
+disputa (retreiná-las sob a mesma validação seria caro demais para o que renderam nas safras
+anteriores). `ETS` e `Theta` vão para `models/` em `.json` — não são `SARIMAXResults` — e é por
+isso que servi-los exige o caminho novo descrito em `docs/CONTRATO_MODELOS.md` §7, ainda não escrito
+em `api/`.
 
 ### Estrutura de pastas
 
@@ -81,7 +95,7 @@ Os três grupos × três prioridades × dois horizontes dão os **18 artefatos**
 | `1_bronze_data/` | `b_incidentes.csv` (pasta Spark), grão do incidente |
 | `2_silver_data/` | 17 fatos e dimensões diários |
 | `3_gold_data/` | previsões e avaliação dos modelos |
-| `models/` | 18 `.pkl` dos vencedores + `manifesto.csv` |
+| `models/` | 18 artefatos dos vencedores (`.pkl` SARIMAX, `.json` ETS/Theta) + `manifesto.csv` |
 | `notebooks/` | os 3 notebooks do pipeline |
 | `notebooks/testes/` | versões antigas, **fora do fluxo** — histórico, não reproduzir |
 | `api/` | FastAPI (`main.py`, `previsao.py`, `ola.py`, `capacidade.py`, `atipicos.py`) + `web/` |
@@ -92,8 +106,9 @@ Os três grupos × três prioridades × dois horizontes dão os **18 artefatos**
 
 ## ⚠️ Nada de dado está versionado
 
-O `.gitignore` exclui **todas** as CSVs das camadas 0–3 e **todos** os `.pkl`. Quem clona este
-repositório recebe só código e documentação — nenhuma tabela, nenhum modelo.
+O `.gitignore` exclui **todas** as CSVs das camadas 0–3, todos os `.pkl` e (desde que `ETS`/`Theta`
+passaram a exportar em JSON) todo `models/*.json`. Quem clona este repositório recebe só código e
+documentação — nenhuma tabela, nenhum modelo.
 
 | Ausente no clone | Tamanho | Quem produz |
 |---|---|---|
@@ -101,7 +116,7 @@ repositório recebe só código e documentação — nenhuma tabela, nenhum mode
 | `1_bronze_data/b_incidentes.csv/` | 27 MB | `notebooks/data_validation.ipynb` |
 | `2_silver_data/*.csv` (17 tabelas) | 13 MB | `notebooks/data_exploration.ipynb` |
 | `3_gold_data/*.csv` (4 tabelas) | 220 KB | `notebooks/model_training.ipynb` |
-| `models/*.pkl` (18 artefatos) | 17 MB | `notebooks/model_training.ipynb` |
+| `models/` (18 artefatos + 18 sidecars `.config.json` + manifesto) | 22 MB | `notebooks/model_training.ipynb` |
 
 **Sem o CSV original não há como reproduzir nada** — nem os notebooks nem a API. A imagem Docker
 também não resolve isso sozinha: ela é montada a partir do dado gerado localmente
@@ -181,9 +196,10 @@ os fatos diários e as dimensões, calcula o atingimento de OLA e faz a análise
 
 ### 4. `notebooks/model_training.ipynb` → camada gold + modelos
 
-Monta as 9 séries, aplica o split treino × teste com embargo, treina e compara ARIMA, SARIMA,
-Prophet, LSTM e XGBoost, escolhe o vencedor de cada `grupo × horizonte` e exporta (§12.4) as 4
-tabelas de `3_gold_data/` e os 18 `.pkl` de `models/`.
+Monta as 9 séries, aplica o split treino × teste com embargo, ajusta `SARIMAX`/`ETS`/`Theta` sob
+um backtest de origem móvel (Prophet/LSTM/XGBoost entram só como referência), escolhe o vencedor
+de cada **série** (`grupo × prioridade × horizonte`) e exporta (§12.4) as 4 tabelas de
+`3_gold_data/` e os 18 artefatos de `models/`.
 
 > **Nunca abrir este notebook com uma leitura de arquivo inteiro** — ele tem 3,7 MB. Para procurar
 > algo dentro dele, iterar as células com `json.load` filtrando pelo termo.
@@ -194,10 +210,13 @@ tabelas de `3_gold_data/` e os 18 `.pkl` de `models/`.
 ./.venv/Scripts/python.exe -m pytest tests/ -q
 ```
 
-É o portão de qualidade: `test_reproducao.py` replica as 18 combinações a partir dos `.pkl` e
+É o portão de qualidade: `test_reproducao.py` replica as 18 combinações a partir de `models/` e
 compara com `3_gold_data/g_previsoes.csv` (divergência máxima aceita: o arredondamento do próprio
 arquivo). `test_classificacao.py` cobre os selos de data nas fronteiras e `test_ola.py`, as regras
 de OLA.
+
+> ⚠️ **Este teste hoje falha.** Ele foi escrito contra a safra anterior (só `ARIMA`/`SARIMA`), e o
+> manifesto atual tem `SARIMAX`/`ETS`/`Theta`. Ver `docs/CONTRATO_MODELOS.md` §7.
 
 ### 6. Subir a API
 

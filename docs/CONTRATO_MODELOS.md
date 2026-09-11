@@ -2,32 +2,53 @@
 
 Fonte da verdade para qualquer código que consuma `models/`. Escrito para dispensar a leitura de
 `notebooks/model_training.ipynb` (3,7 MB) — o que este documento afirma foi extraído de lá (§7.2 e
-§12.4) e **verificado contra `3_gold_data/g_previsoes.csv`**.
+§12.4) e **verificado contra `3_gold_data/g_avaliacao_modelos.csv` e `models/manifesto.csv`**.
+
+> ⚠️ **O contrato mudou nesta safra — `api/` ainda não foi atualizada para ele.** A safra anterior
+> exportava só `SARIMAXResultsWrapper` em pickle. Esta exporta **três famílias**, e 10 dos 18
+> artefatos não são mais pickle de statsmodels. Qualquer código de serving escrito contra a safra
+> anterior vai carregar 8 dos 18 arquivos e falhar silenciosamente nos outros 10 se não tratar
+> `.json`. Ver §1 e §7.
 
 ---
 
 ## 1. O que são os artefatos
 
-18 arquivos em `models/`, mais `manifesto.csv`:
+18 arquivos em `models/`, mais `manifesto.csv` e, para os que não são SARIMAX, um sidecar
+`.config.json`:
 
 ```
-{tipo_tratamento}_P{prioridade}_{D1|D7}_{ARIMA|SARIMA}.pkl
+{tipo_tratamento}_P{prioridade}_{D1|D7}_{SARIMAX|ETS|Theta}.{pkl|json}
+{tipo_tratamento}_P{prioridade}_{D1|D7}_{SARIMAX|ETS|Theta}.config.json    # sidecar
 ```
 
-3 grupos × 3 prioridades × 2 horizontes. O vencedor de cada `grupo × horizonte` serve as 3
-prioridades, mas **cada prioridade tem o seu próprio ajuste** — mesma família, parâmetros
-diferentes.
+3 grupos × 3 prioridades × 2 horizontes = 18 séries, **cada uma com o seu próprio vencedor** —
+famílias e parâmetros diferentes por série, não mais um vencedor por `grupo × horizonte` servindo
+as 3 prioridades. Contagem real desta safra: **8 `SARIMAX`, 7 `Theta`, 3 `ETS`**.
 
-Todos são `statsmodels.tsa.statespace.sarimax.SARIMAXResultsWrapper`, gravados com
-`ajuste.save(caminho)`. Nesta safra **nenhum Prophet e nenhum LSTM foi escolhido**, então servir
-não precisa de `torch`, `prophet`, `cmdstanpy`, `xgboost` nem `scikit-learn`.
+| Família | Extensão | Como é gravado | Como se reconstrói |
+|---|---|---|---|
+| `SARIMAX` | `.pkl` | `statsmodels.tsa.statespace.sarimax.SARIMAXResultsWrapper`, via `ajuste.save(caminho)` | `sm.load(caminho)` — igual à safra anterior |
+| `ETS` | `.json` | Parâmetros do `ETSModel` ajustado, mais a especificação (`trend`, `damped_trend`, `seasonal`, `seasonal_periods`) | `ETSModel(historico, ...).smooth(params)` — **não há pickle**; o histórico entra sempre por fora |
+| `Theta` | `.json` | Só a configuração (`period`, `deseasonalize`) | `ThetaModel(historico, ...).fit()` a cada chamada — **não há estado a carregar**, o método é fechado e reajusta toda vez |
 
-Os parâmetros dentro do artefato estão **congelados no treino**. Quem serve não reajusta: refiltra
-o estado com o dado real disponível até a origem.
+Nenhum Prophet e nenhum LSTM foi escolhido nesta safra — as duas famílias competiram só como
+referência no hold-out, fora da disputa por validação (ver `data_dictionary.md`). Servir não
+precisa de `torch`, `prophet`, `cmdstanpy`, `xgboost` nem `scikit-learn` — mas **precisa agora do
+`ETSModel` e do `ThetaModel` do statsmodels**, já presentes em `requirements_api_container.txt`
+porque a versão do statsmodels é pinada entre notebooks e API (ver CLAUDE.md).
+
+Os parâmetros dentro do artefato SARIMAX/ETS estão **congelados no treino**. Quem serve não
+reajusta: refiltra o estado com o dado real disponível até a origem. O Theta não tem esse conceito
+— cada chamada de serving reajusta com o histórico completo até a origem, porque é isso que o
+notebook faz na avaliação (§7.2).
 
 `manifesto.csv` (`sep=";"`) amarra cada arquivo à linha de `g_avaliacao_modelos` que o justifica —
-`mae`, `mase`, `mae_ingenuo`, `ganho_vs_ingenuo`, `supera_ingenuo`, `regra_ingenua`,
-`ajustado_ate`, `corte_teste`, `n_treino`, `configuracao`.
+`familia`, `transformacao`, `exog`, `mae_cv`, `mae`, `mase`, `mae_ingenuo`, `ganho_vs_ingenuo`,
+`supera_ingenuo`, `regra_ingenua`, `ajustado_ate`, `corte_teste`, `n_treino`, `n_blocos_cv`,
+`configuracao`. As colunas `mae_cv` e `n_blocos_cv` são novas: `mae_cv` é o critério que escolheu
+o modelo (o MAE do backtest de origem móvel, nunca o do teste); `mae` continua sendo o resultado
+medido no hold-out, que não participou da escolha.
 
 ---
 
@@ -55,19 +76,31 @@ projeção; os passos intermediários existem só porque o filtro precisa deles 
 
 ## 3. Exógenas
 
-Só as famílias `SARIMA` recebem exógenas, e só de calendário:
+Só a família `SARIMAX` recebe exógenas, e a lista **varia por série** — não é mais um conjunto
+fixo por horizonte. Cada série passou por uma seleção progressiva (até 3 colunas, cada uma só
+entra se reduzir o MAE de validação além do próprio ruído), então a lista de exógenas de uma
+série não prevê a de outra.
 
-| Horizonte | Colunas | Origem |
+Dois blocos de candidatas possíveis:
+
+| Tipo | Exemplos | Defasagem |
 |---|---|---|
-| `D+1` | `feriado`, `vespera_feriado`, `pos_feriado` | `s_dim_calendario.csv` |
-| `D+7` | `feriados_7d`, `vesperas_7d` | derivadas do calendário (janela retroativa D-6..D) |
+| Calendário | `feriado`, `vespera_feriado`, `pos_feriado`, `dia_util`, `fim_de_semana`, `sen_semana`, `cos_semana` (D+1); `feriados_7d`, `vesperas_7d`, `dias_uteis_7d`, `sen_ano`, `cos_ano` (D+7) | nenhuma — conhecido para qualquer data futura |
+| Estado observado em D | `backlog`, `fechados`, `saldo_aberto_fechado`, `inc_por_ic`, `inc_por_descricao`, `inc_por_time`, `ics_distintos`, `times_distintos`, `descricoes_distintas`, `soma7` | **defasada de `h` dias** (sufixo `_obs1` ou `_obs7`) — a linha D+k carrega o valor de D+k−h, que nunca é posterior à origem |
 
-Os `.pkl` foram ajustados com `numpy.ndarray`, então **não carregam os nomes das colunas** —
-`res.model.exog_names` devolve `x1, x2, ...`. A ordem é a da tabela acima, e a verificação correta
-é cruzar `res.model.k_exog` com o mapa de exógenas do horizonte, na **carga**, não na requisição.
+**A lista efetiva de cada série está em `manifesto.csv`, coluna `exog`** (vazia = `-`), e replicada
+no sidecar `.config.json` de cada artefato. Não assumir nenhuma lista fixa: ler o sidecar antes de
+montar a matriz de exógenas.
 
-Nesta safra apenas `com_intervencao_P*_D1_SARIMA` usa exógenas (`k_exog = 3`); os outros 15 são
-ARIMA puro com `k_exog = 0`.
+Os `.pkl` foram ajustados com `numpy.ndarray` padronizado (centralizado e escalado pela janela de
+treino), então **não carregam os nomes das colunas nem a escala** — `res.model.exog_names` devolve
+`x1, x2, ...`. O sidecar carrega `exog` (ordem), `exog_centro` e `exog_escala`: a exógena bruta
+tem de ser padronizada como `(valor - centro) / escala`, na mesma ordem, antes de entrar no
+`forecast`. A verificação correta é cruzar `res.model.k_exog` com `len(exog)` do sidecar, na
+**carga**, não na requisição.
+
+Nesta safra, das 8 séries `SARIMAX`, 6 usam exógenas (1 a 3 cada) e 2 não usam nenhuma — ver
+`manifesto.csv`.
 
 ---
 
@@ -128,24 +161,74 @@ Origem de teste, formalmente: `data[D+1] >= corte` **e** `D + passos <= último 
 
 ## 7. Como servir
 
+O caminho depende da família — ler `familia` (ou a extensão do arquivo) no `manifesto.csv` antes
+de decidir como carregar.
+
+### SARIMAX
+
 ```python
 import statsmodels.api as sm
 
 res = sm.load(caminho_pkl)                      # parâmetros congelados no treino
+exog_ate_D = (exog_bruta_ate_D - centro) / escala      # de config["exog_centro"/"exog_escala"]
+exog_futuro = (exog_bruta_futura - centro) / escala    # mesma padronização, mesma ordem
 
 previsao = (
     res.apply(historico_ate_D, exog=exog_ate_D, refit=False)   # refiltra o estado
        .forecast(steps=passos, exog=exog_futuro)               # exog_futuro = D+1..D+passos
 )[-1]                                                          # o ÚLTIMO passo é a previsão
 
+if config["transformacao"] == "log1p":
+    previsao = np.expm1(previsao)               # desfazer a transformação, se houver
+
 previsao = max(float(previsao), 0.0)            # contagem não é negativa
 ```
 
 `refit=False` é o ponto todo: os parâmetros não se movem, só o estado do filtro de Kalman avança
-com o dado real. Se o `apply` levantar exceção ou devolver valor não finito, o fallback do notebook
-é o último valor observado da série.
+com o dado real. **A padronização das exógenas e a transformação da série não estão no `.pkl`** —
+vêm do sidecar `.config.json` (§1, §3) e esquecê-las produz previsão sistematicamente errada, sem
+erro nenhum na chamada.
 
-Intervalo de previsão, quando necessário:
+### ETS
+
+```python
+from statsmodels.tsa.exponential_smoothing.ets import ETSModel
+
+cfg = json.load(open(caminho_json))
+y = np.log1p(historico_ate_D) if cfg["transformacao"] == "log1p" else historico_ate_D
+
+modelo = ETSModel(y, error=cfg["error"], trend=cfg["trend"],
+                  damped_trend=cfg["damped_trend"], seasonal=cfg["seasonal"],
+                  seasonal_periods=cfg["seasonal_periods"])
+previsao = modelo.smooth(cfg["params"]).forecast(steps=passos)[-1]
+if cfg["transformacao"] == "log1p":
+    previsao = np.expm1(previsao)
+previsao = max(float(previsao), 0.0)
+```
+
+Não há pickle: o histórico entra sempre de fora, e `smooth(params)` reconstrói o estado do filtro
+sem reajustar os parâmetros — o equivalente do `refit=False` do SARIMAX para esta família.
+
+### Theta
+
+```python
+from statsmodels.tsa.forecasting.theta import ThetaModel
+
+cfg = json.load(open(caminho_json))
+y = np.log1p(historico_ate_D) if cfg["transformacao"] == "log1p" else historico_ate_D
+
+previsao = ThetaModel(y, period=cfg["period"], deseasonalize=cfg["deseasonalize"],
+                      use_test=False).fit().forecast(steps=passos)[-1]
+if cfg["transformacao"] == "log1p":
+    previsao = np.expm1(previsao)
+previsao = max(float(previsao), 0.0)
+```
+
+Não há estado a carregar — o método é fechado e **reajusta a cada chamada** sobre o histórico
+completo. É mais caro por chamada que SARIMAX/ETS, mas nenhuma das 7 séries que o Theta venceu
+tem volume que torne isso um problema de latência.
+
+### Intervalo de previsão (só SARIMAX/ETS, que têm `get_forecast`)
 
 ```python
 proj = res.apply(historico_ate_D, exog=exog_ate_D, refit=False) \
@@ -153,27 +236,48 @@ proj = res.apply(historico_ate_D, exog=exog_ate_D, refit=False) \
 inferior, superior = proj.conf_int(alpha=0.20)[-1]      # banda de 80 %
 ```
 
-### Verificado
+Com `log1p`, o intervalo é construído na escala transformada e trazido de volta com `expm1` nos
+dois limites — quantil é equivariante a transformação monótona, então isso é exato.
 
-Reproduzido contra `g_previsoes.csv` (filtro `escolhido = True`) com diferença máxima de **0,005**,
-que é o arredondamento de 2 casas do próprio arquivo. É o teste de `tests/test_reproducao.py`.
+### Trava de sanidade (todas as famílias)
+
+Replicar no serving o teto que o treino usa para conter raiz explosiva ou extrapolação absurda:
+`previsao = min(previsao, 2 * max(historico_ate_D[-28:]) + 10)`.
+
+### ⚠️ Verificado só parcialmente — `api/` está desatualizada para este contrato
+
+`tests/test_reproducao.py::test_manifesto_cobre_todo_o_grao` afirma
+`modelos.meta(...)["modelo"] in ("ARIMA", "SARIMA")` — essa asserção **falha** contra o manifesto
+atual, que tem `SARIMAX`, `ETS` e `Theta`. `api/previsao.py` foi escrita para a safra anterior e
+não tem caminho de carga para `.json`. Antes de subir esta safra: (1) estender `api/previsao.py`
+com os três blocos de código acima; (2) atualizar a asserção do teste; (3) rodar
+`test_reproducao.py` de novo e confirmar a mesma tolerância de 0,01 nas 18 séries. Nenhum desses
+três passos foi feito ainda.
 
 ---
 
 ## 8. O resultado, sem maquiagem
 
-| Grupo | Horizonte | Vencedor | MAE | MAE ingênuo | Supera o ingênuo? |
-|---|---|---|---|---|---|
-| `com_intervencao` | D+1 | SARIMA | 16,21 | 15,87 | ❌ −2,2 % |
-| `com_intervencao` | D+7 | ARIMA | **58,20** | 91,90 | ✅ **+36,7 %** |
-| `sem_intervencao` | D+1 | ARIMA | 85,83 | 54,13 | ❌ −58,6 % |
-| `sem_intervencao` | D+7 | ARIMA | 563,14 | 458,86 | ❌ −22,7 % |
-| `total` | D+1 | ARIMA | 82,21 | 59,21 | ❌ −38,8 % |
-| `total` | D+7 | ARIMA | 555,80 | 462,97 | ❌ −20,1 % |
+A unidade de decisão é a **série** (`grupo × prioridade × horizonte`), não mais o `grupo ×
+horizonte`. **11 das 18 séries superam o baseline ingênuo** no hold-out — no critério agregado da
+safra anterior isso seria 2 de 6:
 
-**1 de 6 supera o baseline ingênuo.** Recomendação de negócio registrada em
-`3_gold_data/data_dictionary.md`: usar o modelo em produção onde ele ganha — hoje,
-`com_intervencao` em D+7 — e o próprio ingênuo como referência operacional nos demais.
+| Grupo | Horizonte | MAE agregado (3 prioridades) | MAE ingênuo | Ganho agregado |
+|---|---|---|---|---|
+| `com_intervencao` | D+1 | **14,70** | 15,87 | ✅ **+7,4 %** |
+| `com_intervencao` | D+7 | **63,84** | 91,90 | ✅ **+30,5 %** |
+| `sem_intervencao` | D+1 | 56,33 | **54,13** | ❌ −4,1 % |
+| `sem_intervencao` | D+7 | 548,97 | **458,86** | ❌ −19,6 % |
+| `total` | D+1 | 59,62 | **59,21** | ❌ −0,7 % |
+| `total` | D+7 | 521,75 | **462,97** | ❌ −12,7 % |
+
+Detalhamento por série — quem venceu em cada prioridade e por quanto — está em
+`3_gold_data/data_dictionary.md` §"O resultado, sem maquiagem" e em `models/manifesto.csv`.
+
+**Recomendação de negócio, sem mudança de princípio: usar em produção apenas o modelo que supera o
+ingênuo na sua série** — hoje, 11 das 18 — e a própria regra ingênua como referência operacional
+nas outras 7, concentradas em P3 de `sem_intervencao`/`total`, cujo nível salta dentro da própria
+janela de teste (limitação de dado, não de modelo).
 
 Qualquer interface que sirva estes modelos deve mostrar esse fato ao lado da previsão, não
 escondê-lo. As colunas `mae_ingenuo`, `ganho_vs_ingenuo` e `supera_ingenuo` do `manifesto.csv`

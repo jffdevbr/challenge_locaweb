@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe -c ' *)",
+      "Bash(mkdir -p backup_safra1)",
+      "Bash(cp -r models backup_safra1/models)",
+      "Bash(mkdir -p backup_safra1/3_gold_data)",
+      "Bash(cp 3_gold_data/*.csv backup_safra1/3_gold_data/)",
+      "Bash(PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe \"C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/8e696c79-bace-40ec-bab2-c63a278838b4/scratchpad/executar_nb.py\")",
+      "Bash(grep -n \"17 MB\\\\|models/\\\\*\\\\.pkl\\\\|18 \\\\`\\\\.pkl\\\\`\\\\|18 \\\\.pkl\" README.md)",
+      "Bash(grep -n \"\\\\.pkl\\\\|17 MB\\\\|\\\\`models/\\\\`\" docs/README_API.md)",
+      "Bash(grep -n \"5 modelos\\\\|4 modelos\\\\|nenhum Prophet e nenhum LSTM sobreviveu\\\\|todos os artefatos são\\\\|Todos são \\\\`statsmodels\" README.md docs/CONTRATO_MODELOS.md docs/README_API.md 3_gold_data/data_dictionary.md)"
+    ]
+  }
+}

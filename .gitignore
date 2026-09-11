@@ -202,4 +202,13 @@ pyrightconfig.json
 # Arquivos .pkl
 *.pkl
 
+# Artefatos de modelo em JSON (ETS/Theta) e seus sidecars de config — mesmo motivo do .pkl acima:
+# são gerados por notebooks/model_training.ipynb, não versionados.
+models/*.json
+
 # End of https://www.toptal.com/developers/gitignore/api/python
+# resultados de experimentacao (dado gerado, nao versionado)
+experimentos/resultados/
+
+# artefatos da safra anterior, guardados antes do retreino (dado gerado)
+backup_safra1/

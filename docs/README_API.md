@@ -5,6 +5,12 @@ recebem *data + prioridade + horizonte* e devolvem as features de entrada, a pre
 grupos, o valor real quando existe, e três painéis de negócio (risco de OLA, capacidade, dias
 atípicos).
 
+> ⚠️ **Desatualizado para a safra atual de modelos.** Esta página, o código de `api/previsao.py`
+> e `tests/test_reproducao.py` foram escritos para uma safra em que os 18 artefatos eram sempre
+> `SARIMAXResults` em `.pkl`. A safra atual tem `SARIMAX`, `ETS` e `Theta` — 10 dos 18 artefatos
+> são `.json`, não pickle — e nada abaixo que fale de carregar `.pkl` cobre os outros dois
+> formatos. Ver `docs/CONTRATO_MODELOS.md` §1 e §7 antes de mexer em `api/`.
+
 O contrato dos modelos está em [`docs/CONTRATO_MODELOS.md`](CONTRATO_MODELOS.md). A visão geral do
 projeto e o passo a passo que produz o dado que esta API lê estão no
 [`README.md`](../README.md) da raiz.
@@ -19,7 +25,8 @@ projeto e o passo a passo que produz o dado que esta API lê estão no
 docker compose up --build
 ```
 
-Abre em **http://localhost:8000** (documentação interativa em `/docs`). Os `.pkl` e as CSVs ficam
+Abre em **http://localhost:8000** (documentação interativa em `/docs`). Os artefatos de `models/`
+(`.pkl` e `.json`) e as CSVs ficam
 montados como somente-leitura a partir da própria árvore do repositório — retreinou no notebook?
 Basta `docker compose restart`, sem rebuild.
 
@@ -30,7 +37,7 @@ docker build -t lw-previsao:1.0 .
 docker run --rm -p 8000:8000 lw-previsao:1.0
 ```
 
-A imagem (~530 MB, dos quais ~19 MB de dado) roda em qualquer máquina sem preparar pasta nenhuma.
+A imagem (~535 MB, dos quais ~25 MB de dado) roda em qualquer máquina sem preparar pasta nenhuma.
 
 ### Sem container
 
@@ -44,15 +51,15 @@ A imagem (~530 MB, dos quais ~19 MB de dado) roda em qualquer máquina sem prepa
 ## ⚠️ Como o dado entra no container
 
 **Nada do que a API precisa está versionado.** O `.gitignore` do projeto exclui todas as CSVs das
-camadas 0–3 e todos os `.pkl` (`*.pkl`). Quem clona o repositório recebe só código — e é por isso
-que existem os dois caminhos acima em vez de um `git clone && docker build` que funcionaria em
-qualquer lugar.
+camadas 0–3, todos os `.pkl` e todo `models/*.json` (ETS/Theta e os sidecars `.config.json`). Quem
+clona o repositório recebe só código — e é por isso que existem os dois caminhos acima em vez de
+um `git clone && docker build` que funcionaria em qualquer lugar.
 
-Os 19 MB que a API lê:
+Os ~25 MB que a API lê:
 
 | Arquivo | Tamanho | Para quê |
 |---|---|---|
-| `models/` (18 `.pkl` + `manifesto.csv`) | 17 MB | os modelos e o que justifica cada um |
+| `models/` (18 artefatos `.pkl`/`.json` + sidecars + `manifesto.csv`) | 22 MB | os modelos e o que justifica cada um |
 | `2_silver_data/s_fato_diario_prioridade.csv` | 1,5 MB | a série e as features |
 | `2_silver_data/s_dim_calendario.csv` | 210 KB | calendário, inclusive 2026 (exógena futura) |
 | `2_silver_data/s_fato_ola_prioridade.csv` | 113 KB | acumulado anual e atingimento de OLA |
@@ -205,9 +212,11 @@ Azure está em [`../azure/provisionar.sh`](../azure/provisionar.sh).
 
 | Arquivo | O que garante |
 |---|---|
-| `test_reproducao.py` | **portão de qualidade** — as 18 combinações replicadas contra `g_previsoes.csv`; também a identidade `soma7(D+7) = acumulado D+1..D+7` e `total = com + sem` |
+| `test_reproducao.py` | **portão de qualidade** — as 18 combinações replicadas contra `g_previsoes.csv`; também a identidade `soma7(D+7) = acumulado D+1..D+7` e `total = com + sem`. ⚠️ **Falha na safra atual** — foi escrito assumindo `modelo in ("ARIMA", "SARIMA")`, e o manifesto atual tem `SARIMAX`/`ETS`/`Theta` (ver `docs/CONTRATO_MODELOS.md` §7) |
 | `test_classificacao.py` | os selos nas fronteiras exatas; 6 origens de embargo por série no D+7, nenhuma no D+1; contagem de origens de teste batendo com a cobertura da gold |
 | `test_ola.py` | o atingimento calculado reproduz `s_fato_ola_prioridade` dia a dia; P4 sem meta; faixa de volume estourada sinalizada; o alerta de 15/12 caindo a ≤ 3 dias do cruzamento real |
 
-**Reprodução verificada também pela HTTP, com o container de pé:** 534 origens de teste, as 18
-combinações, **divergência máxima 0,00** contra a camada gold.
+**Reprodução pela HTTP não reverificada nesta safra.** A afirmação anterior desta seção (534
+origens, divergência máxima 0,00) valia para o serving em `.pkl` puro; com `ETS`/`Theta` em
+`.json` no manifesto, `api/previsao.py` precisa do caminho de carga descrito em
+`docs/CONTRATO_MODELOS.md` §7 antes que essa verificação volte a valer.

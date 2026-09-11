@@ -7,11 +7,17 @@ nulo — mesma função e mesmo contrato das camadas bronze e silver.
 **Formato de todos os arquivos:** CSV, separador `;`, encoding `utf-8-sig`, sem índice.
 Colunas de data são strings ISO `YYYY-MM-DD` (sem hora, sem fuso).
 
-> ⚠️ **Esta versão mudou o desenho do treino.** Os dois horizontes passaram a ser treinados
-> separadamente e previstos de forma **direta**; o piso ingênuo do D+7 mudou de regra; e os
-> tamanhos de teste foram redimensionados. **Números desta versão não são comparáveis com os da
-> anterior**, em particular `mae_ingenuo` e tudo que deriva dele no horizonte D+7. As seções
-> *Horizontes* e *O piso do D+7 subiu* explicam o quê e o porquê.
+> ⚠️ **Esta versão mudou o desenho do treino, duas vezes.** A safra 2 separou os horizontes e os
+> passou a prever de forma direta (piso do D+7 mudou de regra, tamanhos de teste redimensionados).
+> A safra 3 — a atual — mudou o **protocolo de seleção**: o vencedor deixou de ser escolhido pelo
+> MAE do próprio conjunto de teste e passou a ser escolhido por um backtest de origem móvel dentro
+> do treino (§7.2); a escolha deixou de ser por `grupo × horizonte` e passou a ser por **série**
+> (`grupo × prioridade × horizonte`); e duas famílias novas — `ETS` e `Theta` — entraram na
+> disputa ao lado do que virou `SARIMAX` (fusão de `ARIMA`/`SARIMA` numa família só, com `d`, a
+> transformação e o bloco sazonal decididos pela validação em vez do teste ADF). **Números desta
+> versão não são comparáveis com os das duas anteriores** — em particular `mae_ingenuo` no D+7 e
+> qualquer leitura em `prioridade = "todas"`, que agora é diagnóstico, não critério de escolha. As
+> seções *Horizontes*, *O piso do D+7 subiu* e *Os modelos* explicam o quê e o porquê.
 
 ---
 
@@ -19,8 +25,8 @@ Colunas de data são strings ISO `YYYY-MM-DD` (sem hora, sem fuso).
 
 | Arquivo | Grão / chave | Linhas × colunas | Para quê |
 |---|---|---|---|
-| [`g_previsoes`](#g_previsoescsv) | data × prioridade × tipo_tratamento × horizonte × modelo | 2.670 × 9 | Toda previsão de teste, de **todos** os modelos, contra o valor real |
-| [`g_avaliacao_modelos`](#g_avaliacao_modeloscsv) | tipo_tratamento × prioridade × horizonte × modelo | 120 × 17 | Quanto cada modelo errou (geral e por prioridade), contra o piso ingênuo, e qual foi escolhido |
+| [`g_previsoes`](#g_previsoescsv) | data_origem × prioridade × tipo_tratamento × horizonte × modelo | 3.204 × 11 | Toda previsão de teste, de **todos** os modelos, contra o valor real |
+| [`g_avaliacao_modelos`](#g_avaliacao_modeloscsv) | tipo_tratamento × prioridade × horizonte × modelo | 144 × 19 | Quanto cada modelo errou (geral e por prioridade), contra o piso ingênuo e contra a validação, e qual foi escolhido |
 | [`g_comparacao_grao`](#g_comparacao_graocsv) | horizonte × prioridade | 8 × 12 | Separar por tipo compensa? Soma de 2 modelos × modelo único sobre o total |
 | [`g_ablacao_exogenas`](#g_ablacao_exogenascsv) | tipo_tratamento × horizonte × medidor | 8 × 12 | Quanto valem as features exógenas, nos dois horizontes, com o efeito mínimo detectável ao lado |
 
@@ -55,28 +61,44 @@ teste é sempre a fatia mais recente. Cada modelo é ajustado uma vez por série
 
 ### Os modelos
 
-Cada série tem **dois** modelos de cada família — um por horizonte, ajustados em séries
-diferentes. É a mudança de desenho desta versão.
+Cada **série** (`grupo × prioridade × horizonte`, 18 no total) tem o seu próprio vencedor,
+escolhido entre três famílias que disputam pela validação — mais duas que entram só como
+referência de contexto, medidas apenas no hold-out.
 
-| Modelo | D+1 — série diária `abertos` | D+7 — série agregada `soma7` | Complexidade |
-|---|---|---|---|
-| `ARIMA` | Autorregressivo + média móvel. Só o histórico de `abertos` | O mesmo sobre a soma móvel. A grade de `q` vai até **7**: a agregação induz média móvel de ordem 6, porque janelas vizinhas compartilham 6 dias | 1 |
-| `SARIMA` | ARIMA + bloco sazonal de período 7 + `feriado`, `vespera_feriado`, `pos_feriado` | **Sem bloco sazonal** — 7 dias consecutivos têm sempre um de cada dia da semana, então a sazonalidade semanal não sobrevive à agregação. Resta ARIMA + `feriados_7d`, `vesperas_7d` | 2 |
-| `Prophet` | Tendência plana + sazonalidade semanal + tabela de feriados + regressores de véspera/pós | Tendência plana, **sem sazonalidade semanal** e **sem tabela de feriados** — num total semanal o feriado é uma contagem, não um ponto, e entra como regressor `feriados_7d` | 3 |
-| `LSTM` | Janela de 14 dias → o valor de amanhã | Janela de 14 dias → a soma dos 7 dias seguintes, **numa aplicação só** | 4 |
-| `Ingênuo` | O valor de hoje | A melhor das duas regras, escolhida **dentro do treino** — ver *O piso do D+7 subiu* | — (piso, não candidato) |
+| Modelo | O que é | Disputa a escolha? |
+|---|---|---|
+| `SARIMAX` | ARIMA/SARIMA fundidos numa família só. `d`, `D`, a transformação (`nenhuma`/`log1p`), o `trend` e o bloco sazonal são dimensões da busca, decididas pelo erro fora da amostra — não por AIC nem por teste de hipótese. Exógenas entram por seleção progressiva (calendário sem defasagem; estado observado em D defasado de `h` dias) | Sim |
+| `ETS` | Suavização exponencial, com tendência amortecida opcional e bloco sazonal onde há sinal semanal. Família desenhada para nível em deriva — segue a tendência e desacelera, em vez de projetá-la para sempre | Sim |
+| `Theta` | Método Theta (vencedor da M3). Fechado, reajusta a cada origem; o artefato é a configuração, não pesos | Sim |
+| `Prophet` | Tendência plana + sazonalidade semanal (D+1) / regressores de janela (D+7) | Não — referência no hold-out |
+| `LSTM` | Janela de 14 dias, com as 10 exógenas do bloco pré-registrado | Não — referência no hold-out |
+| `Ingênuo` | A melhor das regras candidatas, escolhida **dentro do treino** — ver *O piso do D+7 subiu* | Piso, não candidato |
 
-Ordens escolhidas por **AIC** dentro do treino; `d` vem do teste ADF. Uma leitura que confirma o
-argumento da grade: **as 9 séries de D+7 escolheram `q = 7`** — a grade da versão anterior, que
-parava em `q = 3`, não teria como representar a estrutura que a soma móvel induz. No agregado o
-ADF também passou a pedir `d = 1` na maioria das séries, contra `d = 0` em todas as diárias.
+**Prophet e LSTM ficam fora da disputa por restrição de custo, não por veredito sobre as duas
+famílias**: pontuá-los sob o mesmo backtest de origem móvel exigiria retreinar a rede por bloco de
+validação e triplicar os ajustes do Prophet. Nenhuma delas venceu série alguma nas duas safras
+anteriores, o que tornou o corte razoável, mas é uma limitação declarada do protocolo.
 
-**A entrada do LSTM inclui 10 features exógenas**, o que era impossível no desenho anterior:
-`inc_por_ic`, `inc_por_descricao`, `inc_por_time`, `fechados`, `backlog`,
-`saldo_aberto_fechado`, `abertos_sem_classificacao`, `ics_distintos`, `times_distintos`,
-`descricoes_distintas`. O conjunto é **pré-registrado**: foi fixado a partir da leitura por
-*família* de §5.5, e não do ranking por permutação de §5.3 — aquele é calculado no teste, e
-usá-lo para selecionar features vazaria o teste para dentro do modelo.
+**Por que `d` deixou de vir do ADF.** Na safra anterior o teste ADF (α = 0,05) devolvia `d = 0`
+para as 9 séries de D+1, inclusive para as que multiplicam de nível no período — o resultado eram
+modelos de média móvel presos a uma constante tentando prever uma série que sobe. `d`, `D` e a
+transformação agora são buscados e avaliados pelo MAE do backtest, exatamente como a estrutura de
+ordem `(p, q)`, que continua saindo do AICc **dentro** de cada família (comparação legítima porque
+mantém escala e observações efetivas fixas; **entre** famílias, quem decide é o backtest).
+
+O bloco sazonal só entra na disputa (SARIMAX e ETS) onde o η² do dia-da-semana no treino passa de
+0,05, e só no D+1 — `soma7` cobre sempre 7 dias consecutivos, um de cada dia da semana, e o ciclo
+semanal não sobrevive à agregação. A grade de `q` no D+7 vai até **9** (a versão anterior parava em
+7 e saturava nas 9 séries).
+
+**As exógenas observadas** (`inc_por_ic`, `inc_por_descricao`, `inc_por_time`, `fechados`,
+`backlog`, `saldo_aberto_fechado`, `abertos_sem_classificacao`, `ics_distintos`, `times_distintos`,
+`descricoes_distintas`, mais `soma7`) chegam ao SARIMAX defasadas de `h` dias — a coluna
+`<c>_obs<h>` na linha D+k carrega o valor de `c` em D+k−h, que nunca é posterior à origem. Isso é
+o que as torna admissíveis num modelo que precisa da exógena em cada passo previsto. Elas eram
+exclusividade do LSTM nas duas safras anteriores; agora chegam a até 3 por série, escolhidas por
+um portão pareado (a inclusão só entra se reduzir o MAE de CV além do próprio ruído da diferença
+pareada de erros).
 
 ### Horizontes
 
@@ -107,9 +129,9 @@ O preço da recursão também estava medido: o LSTM em `sem_intervencao` saía d
 D+1 para **1.081,6** em D+7, contra 635,0 do ingênuo. Não era o horizonte que era difícil; era o
 erro do passo 1 entrando como dado no passo 2, sete vezes.
 
-O ARIMA/SARIMA andam pelo teste com os **parâmetros congelados**, refiltrando o estado com o dado
-real até cada origem. O Prophet é **reajustado em cada origem** — ele não é autorregressivo e não
-tem estado a atualizar. O LSTM é treinado uma vez por série e por horizonte.
+O SARIMAX e o ETS andam pelo teste com os **parâmetros congelados**, refiltrando o estado com o
+dado real até cada origem. O Theta e o Prophet são **reajustados em cada origem** — nenhum dos
+dois tem estado a atualizar. O LSTM é treinado uma vez por série e por horizonte.
 
 ### O piso do D+7 subiu
 
@@ -174,40 +196,37 @@ que reusaria o mesmo dado finito.
 
 ### O resultado, sem maquiagem
 
-| Grupo | Horizonte | Vencedor | MAE | MASE | MAE do ingênuo | Regra do ingênuo | Supera o ingênuo? |
-|---|---|---|---|---|---|---|---|
-| `com_intervencao` | D+1 | SARIMA | 16,21 | 0,95 | **15,87** | último valor | ❌ −2,2 % |
-| `com_intervencao` | D+7 | ARIMA | **58,20** | 0,90 | 91,90 | soma da última semana | ✅ **+36,7 %** |
-| `sem_intervencao` | D+1 | ARIMA | 85,83 | 1,55 | **54,13** | último valor | ❌ −58,6 % |
-| `sem_intervencao` | D+7 | ARIMA | 563,14 | 1,90 | **458,86** | mista por prioridade | ❌ −22,7 % |
-| `total` | D+1 | ARIMA | 82,21 | 1,23 | **59,21** | último valor | ❌ −38,8 % |
-| `total` | D+7 | ARIMA | 555,80 | 1,58 | **462,97** | mista por prioridade | ❌ −20,1 % |
+A unidade de decisão passou a ser a **série** (`grupo × prioridade × horizonte`, 18 no total), não
+o `grupo × horizonte` agregado. **11 das 18 séries superam o baseline ingênuo** — no critério
+agregado anterior isso seria só 2 de 6, e é assim que a tabela abaixo apresenta os dois números
+lado a lado: o agregado por transparência histórica, o resultado por série porque é o que decide.
 
-**1 de 6 vencedores supera o baseline ingênuo** — mas esse caso mudou de natureza. Em
-`com_intervencao` D+7 os **quatro** candidatos passam a superar o piso, e por margem larga:
+| Grupo | Horizonte | MAE (ponderado pelas 3 prioridades) | MAE do ingênuo | Ganho agregado | Vencedores por prioridade |
+|---|---|---|---|---|---|
+| `com_intervencao` | D+1 | **14,70** | 15,87 | ✅ **+7,4 %** | P2: SARIMAX · P3: ETS · P4: SARIMAX |
+| `com_intervencao` | D+7 | **63,84** | 91,90 | ✅ **+30,5 %** | P2: SARIMAX · P3: Theta · P4: SARIMAX |
+| `sem_intervencao` | D+1 | 56,33 | **54,13** | ❌ −4,1 % | P2: Theta · P3: Theta · P4: Theta |
+| `sem_intervencao` | D+7 | 548,97 | **458,86** | ❌ −19,6 % | P2: SARIMAX · P3: SARIMAX · P4: Theta |
+| `total` | D+1 | 59,62 | **59,21** | ❌ −0,7 % | P2: ETS · P3: Theta · P4: Theta |
+| `total` | D+7 | 521,75 | **462,97** | ❌ −12,7 % | P2: SARIMAX · P3: SARIMAX · P4: ETS |
 
-| Modelo | MAE | vs. ingênuo |
-|---|---|---|
-| SARIMA | **55,89** | +39,2 % |
-| ARIMA | 58,20 | +36,7 % |
-| LSTM | 82,16 | +10,6 % |
-| Prophet | 88,67 | +3,5 % |
-| Ingênuo | 91,90 | — |
+O ganho da leitura por série sobre o agregado é grande e concentrado no horizonte curto:
+`com_intervencao` D+1 virou de −2,2 % (safra anterior) para **+7,4 %** sem que a estrutura em si
+tenha piorado muito — a mudança dominante foi parar de deixar P3 escolher o modelo sozinha. Em
+`sem_intervencao` e `total` o quadro melhora (de −58,6 % e −38,8 % para −4,1 % e −0,7 % em D+1) mas
+não vira, porque a causa não é de protocolo: ver a ressalva abaixo.
 
-(O ARIMA é o escolhido, não o SARIMA: a diferença de 4 % cai dentro da tolerância de empate
-técnico de 5 %, e a regra manda ficar com o menos complexo.)
+**As séries individuais que ainda perdem, e por quê.** Sete das 18 perdem para o ingênuo; a maior
+concentração de perda está em P3 de `sem_intervencao` e `total`, cujo nível **triplica dentro da
+própria janela de teste** (média diária de ~104/dia em novembro para ~273/dia em dezembro — um
+degrau, não uma tendência). Nenhuma família, transformação ou hiperparâmetro escolhido pela
+validação acompanha isso, porque o treino termina antes do salto: é limitação de dado, não de
+modelagem, e o gatilho correto ali é retreino, não mais busca de modelo.
 
-**De onde veio esse ganho — e não é de onde se esperava.** Quem vence ali é ARIMA/SARIMA **sobre
-a série agregada**, não o LSTM que recebeu as exógenas. O que produziu o resultado foi **tirar a
-recursão**, não acrescentar feature. O desenho anterior compunha erro por sete passos, e era isso
-que dominava o horizonte longo. A mudança de features, medida isoladamente em `g_ablacao_exogenas`,
-fica dentro do ruído em 5 dos 6 cortes.
-
-Nos outros 5 cortes o ingênuo continua ganhando, e a leitura de §3 continua valendo: o resíduo do
-STL responde por **58 % da média do nível** nas 9 séries. Numa série assim o ingênuo é forte
-porque se reancora todo dia no nível corrente. **Recomendação de negócio: usar o modelo em
-produção apenas onde ele supera o ingênuo** — hoje, `com_intervencao` em D+7 — e o próprio
-ingênuo como referência operacional nos demais.
+**Recomendação de negócio, sem mudança de princípio em relação à safra anterior: usar em produção
+apenas o modelo que supera o ingênuo na sua série** — hoje, 11 das 18 — e a própria regra ingênua
+como referência operacional nas outras 7. `manifesto.csv` carrega `supera_ingenuo` por artefato
+para que isso não dependa de reler este documento.
 
 ### O estudo de features (§4–§5 do notebook)
 
@@ -293,8 +312,8 @@ modelo.** O caminho que o resultado aponta não é mais feature engineering sobr
 
 # g_previsoes.csv
 
-**Grão:** `data × prioridade × tipo_tratamento × horizonte × modelo` · **Chave:** as 5 colunas ·
-**2.670 linhas × 9 colunas**.
+**Grão:** `data_origem × prioridade × tipo_tratamento × horizonte × modelo` · **Chave:** as 5
+colunas (com `data_origem`, não `data` — ver abaixo) · **3.204 linhas × 11 colunas**.
 
 Guarda a previsão de **todos os modelos**, não só do vencedor — é o que torna §8 e §9 do notebook
 auditáveis a partir do arquivo, sem reexecutar nada.
@@ -303,28 +322,30 @@ auditáveis a partir do arquivo, sem reexecutar nada.
 
 | Coluna | Tipo | Nulo | Domínio |
 |---|---|---|---|
-| `data` | date | 0 % | D+1: dia **previsto** (data-alvo). D+7: dia de **origem** (a semana prevista é `data+1` a `data+7`) |
+| `data` | date | 0 % | ⚠️ **Obsoleta, mantida só para não quebrar quem já consome o arquivo.** Repete `data_alvo` no D+1 e `data_origem` no D+7 — o mesmo nome significava coisas diferentes nos dois horizontes, o que já causou pelo menos uma comparação incorreta por quem casou tabelas por `data` sem notar. Usar `data_origem`/`data_alvo` |
+| `data_origem` | date | 0 % | **Nova.** O dia `D` em que a previsão é feita — sempre um dia observável, nos dois horizontes |
+| `data_alvo` | date | 0 % | **Nova.** O dia (D+1) ou o dia que fecha a janela (D+7) a que `valor_previsto`/`valor_real` se referem. É `data_origem + passos` |
 | `prioridade` | int | 0 % | 2, 3, 4 |
 | `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao`, `total` |
 | `horizonte` | str | 0 % | `D+1`, `D+7` |
-| `modelo` | str | 0 % | `ARIMA`, `SARIMA`, `Prophet`, `LSTM`, `Ingênuo` |
+| `modelo` | str | 0 % | `SARIMAX`, `ETS`, `Theta`, `Prophet`, `LSTM`, `Ingênuo` |
 
 ### Conteúdo
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
 | `em_teste` | bool | 0 % | Sempre `True` — só previsões out-of-sample entram, nenhuma linha in-sample |
-| `escolhido` | bool | 0 % | `True` se este modelo é o vencedor do seu grupo × horizonte (§9) |
-| `valor_previsto` | float | 0 % | D+1: previsão de `abertos` para `data`. D+7: previsão **direta** do acumulado de `data+1` a `data+7` — não é mais a soma de 7 previsões. Nunca negativo, arredondado em 2 casas |
-| `valor_real` | float | 0 % | D+1: `abertos` real em `data`. D+7: soma real de `abertos` em `data+1`…`data+7` (`y_abertos_acum_1a7`) |
+| `escolhido` | bool | 0 % | `True` se este modelo é o vencedor da sua **série** (`grupo × prioridade × horizonte`, §9) — não mais do grupo agregado |
+| `valor_previsto` | float | 0 % | D+1: previsão de `abertos` para `data_alvo`. D+7: previsão **direta** do acumulado até `data_alvo` — não é a soma de 7 previsões. Nunca negativo, arredondado em 2 casas |
+| `valor_real` | float | 0 % | D+1: `abertos` real em `data_alvo`. D+7: soma real de `abertos` na janela que termina em `data_alvo` (`y_abertos_acum_1a7`) |
 
 ### Cobertura
 
-| Grupo | Origens D+1 | Linhas D+1 (3 prioridades × 5 modelos) | Origens D+7 | Linhas D+7 |
+| Grupo | Origens D+1 | Linhas D+1 (3 prioridades × 6 modelos) | Origens D+7 | Linhas D+7 |
 |---|---|---|---|---|
-| `com_intervencao` | 42 | 630 | 36 | 540 |
-| `sem_intervencao` | 28 | 420 | 22 | 330 |
-| `total` | 28 | 420 | 22 | 330 |
+| `com_intervencao` | 42 | 756 | 36 | 648 |
+| `sem_intervencao` | 28 | 504 | 22 | 396 |
+| `total` | 28 | 504 | 22 | 396 |
 
 O D+7 tem 6 origens a menos porque cada uma precisa de 7 dias reais **depois** dela para ter valor
 de comparação — as últimas 6 do teste não têm. É a mesma janela de 7 dias que, do outro lado da
@@ -335,58 +356,62 @@ fronteira, tira 6 origens do fim do treino (o embargo).
 # g_avaliacao_modelos.csv
 
 **Grão:** `tipo_tratamento × prioridade × horizonte × modelo` · **Chave:** as 4 colunas ·
-**120 linhas × 17 colunas** (3 grupos × 4 níveis de prioridade × 2 horizontes × 5 modelos).
+**144 linhas × 19 colunas** (3 grupos × 4 níveis de prioridade × 2 horizontes × 6 modelos).
 
-`prioridade = "todas"` é a leitura **geral** (as 3 prioridades juntas), que é a que decide o
-vencedor; as linhas `2`, `3`, `4` são o mesmo modelo fatiado por prioridade.
+`prioridade = "todas"` é a leitura **geral** (as 3 prioridades juntas). Ela deixou de decidir o
+vencedor — vira **diagnóstico** (§9.1 do notebook) — porque soma MAE de séries de nível muito
+diferente e, na prática, deixava a de maior volume escolher sozinha para as outras duas. Quem
+decide agora são as linhas `"2"`, `"3"`, `"4"`, cada uma com o seu próprio vencedor.
 
 ### Chave
 
 | Coluna | Tipo | Nulo | Domínio |
 |---|---|---|---|
 | `tipo_tratamento` | str | 0 % | `com_intervencao`, `sem_intervencao`, `total` |
-| `prioridade` | str | 0 % | `"todas"` (geral) ou `"2"`, `"3"`, `"4"` |
+| `prioridade` | str | 0 % | `"todas"` (diagnóstico) ou `"2"`, `"3"`, `"4"` (decidem o vencedor) |
 | `horizonte` | str | 0 % | `D+1`, `D+7` |
-| `modelo` | str | 0 % | `ARIMA`, `SARIMA`, `Prophet`, `LSTM`, `Ingênuo` |
+| `modelo` | str | 0 % | `SARIMAX`, `ETS`, `Theta`, `Prophet`, `LSTM`, `Ingênuo` |
 
 ### Métricas
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
 | `n` | int | 0 % | Pontos de teste avaliados |
-| `mae` | float | 0 % | Erro absoluto médio, em incidentes/dia (D+1) ou incidentes/semana (D+7). **É a métrica de decisão** |
-| `rmse` | float | 0 % | Raiz do erro quadrático médio |
+| `mae_cv` | float | por `prioridade="todas"` | **Nova, e é a que decide.** MAE do backtest de origem móvel dentro do treino — nunca toca o teste. Nulo na leitura agregada de modelos não elegíveis à CV (ver `elegivel_cv`) |
+| `elegivel_cv` | bool | 0 % | **Nova.** `True` para `SARIMAX`/`ETS`/`Theta` — só eles disputam a escolha por `mae_cv`. `Prophet` e `LSTM` ficam de fora por custo de retreino sob CV multibloco, não por veredito sobre as famílias |
+| `mae` | float | 0 % | Erro absoluto médio **no hold-out**, em incidentes/dia (D+1) ou incidentes/semana (D+7). É **resultado**, não critério — a mudança central desta versão é que a escolha nunca olha esta coluna |
+| `rmse` | float | 0 % | Raiz do erro quadrático médio, no hold-out |
 | `mase` | float | 0 % | MAE ÷ erro da **mesma regra ingênua aplicada no treino**. Escala-livre: **< 1 = erra menos que o ingênuo cometia no treino**. É a métrica comparável **entre** séries |
 | `mape` | float | 0 % | Erro percentual absoluto, com `max(y, 1)` no denominador. ⚠️ **Quebra nas séries de contagem baixa**: valores de centenas de % são artefato do denominador. Preferir `mase` |
-| `mae_ingenuo` | float | 0 % | MAE do baseline ingênuo na mesma leitura, horizonte e datas — o piso |
-| `regra_ingenua` | str | 0 % | **Nova.** Qual regra define o piso: `último valor` (D+1); em D+7, `soma da última semana` ou `7 x abertos[D]`, escolhida no treino. Nas linhas `prioridade = "todas"` aparecem as regras distintas das 3 prioridades, separadas por vírgula |
-| `ganho_vs_ingenuo` | float | 0 % | `(1 − mae/mae_ingenuo) × 100`. Negativo = perde para o ingênuo |
-| `supera_ingenuo` | bool | 0 % | `mae < mae_ingenuo`. Sempre `False` nas linhas do próprio ingênuo |
+| `mae_ingenuo` | float | 0 % | MAE do baseline ingênuo na mesma leitura, horizonte e datas — o piso, no hold-out |
+| `regra_ingenua` | str | 0 % | Qual regra define o piso: `último valor` (D+1); em D+7, `soma da última semana` ou `7 x abertos[D]`, escolhida no treino. Nas linhas `prioridade = "todas"` aparecem as regras distintas das 3 prioridades, separadas por vírgula |
+| `ganho_vs_ingenuo` | float | 0 % | `(1 − mae/mae_ingenuo) × 100`, no hold-out. Negativo = perde para o ingênuo |
+| `supera_ingenuo` | bool | 0 % | `mae < mae_ingenuo`, no hold-out. Sempre `False` nas linhas do próprio ingênuo |
 
 Sem a coluna `regra_ingenua`, um `mae_ingenuo` de D+7 não diz contra o que o modelo está correndo
 — e as duas regras diferem em até 17 % de MAE.
 
-`mase` e `ganho_vs_ingenuo` medem coisas próximas mas não idênticas: o `mase` compara com o
-ingênuo **no treino** (referência estável), o `ganho_vs_ingenuo` com o ingênuo **no teste**
-(mesmas datas). Divergência entre os dois é informação — significa que o período de teste foi mais
-fácil ou mais difícil que o treino para uma previsão ingênua.
+`mae_cv` e `mae` medem coisas diferentes por desenho: `mae_cv` é o que decide o vencedor, medido
+**antes** de tocar o teste; `mae` é o que aconteceu no teste, e as duas colunas podem discordar —
+é exatamente esse contraste que prova que a escolha não está enviesada pelo hold-out. `mase` e
+`ganho_vs_ingenuo` também medem coisas próximas mas não idênticas entre si: o primeiro compara com
+o ingênuo **no treino** (referência estável), o segundo com o ingênuo **no teste** (mesmas datas).
 
 ### Desenho e escolha
 
 | Coluna | Tipo | Nulo | Descrição |
 |---|---|---|---|
-| `serie_modelada` | str | 0 % | **Nova.** Contra que série o modelo foi ajustado: `abertos` (D+1) ou `soma7` (D+7) |
-| `usa_exogenas` | bool | 0 % | **Nova.** `True` para o LSTM, o único candidato que recebe o bloco de 10 features exógenas |
-| `complexidade` | int | 0 % | 1 = ARIMA, 2 = SARIMA, 3 = Prophet, 4 = LSTM, 0 = ingênuo. É o critério de desempate |
-| `escolhido` | bool | 0 % | Vencedor do grupo × horizonte. Uma linha `True` por combinação, sempre em `prioridade = "todas"` |
+| `serie_modelada` | str | 0 % | Contra que série o modelo foi ajustado: `abertos` (D+1) ou `soma7` (D+7) |
+| `usa_exogenas` | bool | 0 % | **Mudou de significado.** Antes era `True` só para o LSTM; agora é `True` para qualquer `SARIMAX` que tenha recebido ao menos uma exógena pela seleção progressiva (até 3 por série) — e continua `True` para o LSTM, que sempre recebe o bloco pré-registrado |
+| `complexidade` | int | 0 % | `Theta`=1, `ETS`=2, `SARIMAX`=3, `Prophet`=4, `LSTM`=5, `Ingênuo`=0. Critério de desempate quando dois candidatos empatam em `mae_cv` dentro de 0,5 % — não mais de 5 % |
+| `escolhido` | bool | 0 % | **Mudou de grão.** Vencedor da **série** (`grupo × prioridade × horizonte`). Uma linha `True` por combinação em `prioridade ∈ {"2","3","4"}` — não mais uma por `prioridade = "todas"` |
 
-**Regra de escolha**, nesta ordem: (1) candidatos são os 4 modelos — o ingênuo **não concorre**;
-(2) menor MAE na leitura geral; (3) empate técnico (diferença de MAE < 5 %) resolvido pelo **menos
-complexo**; (4) se o vencedor perder para o ingênuo, isso é **registrado com destaque** e a
-escolha se mantém, mas a leitura de negócio muda.
-
-O passo (3) foi acionado em 2 dos 6 casos, os dois em D+7: `com_intervencao` (ARIMA no lugar do
-SARIMA) e `sem_intervencao` (ARIMA no lugar do SARIMA).
+**Regra de escolha**, nesta ordem: (1) candidatos são `SARIMAX`, `ETS` e `Theta` — o ingênuo e as
+duas famílias de referência **não concorrem**; (2) menor `mae_cv`, o MAE do backtest de origem
+móvel; (3) empate resolvido pelo **menos complexo** só quando a diferença de `mae_cv` é menor que
+0,5 % — não os 5 % da safra anterior, porque naquela margem quase tudo empatava e a regra acabava
+premiando o modelo mais simples por padrão; (4) se o vencedor perder para o ingênuo **no hold-out**
+(coluna `mae`, nunca usada na escolha), isso é registrado com destaque e a escolha se mantém.
 
 ---
 
@@ -411,33 +436,41 @@ Os dois lados são medidos **nas mesmas datas** (a interseção das janelas de t
 | `mae_modelo_unico` | float | 0 % | MAE do modelo treinado sobre o total, sem o grão de tipo |
 | `mape_modelo_unico` | float | 0 % | MAPE do modelo único |
 | `vantagem_da_separacao` | float | 0 % | `(1 − mae_soma/mae_unico) × 100`. **Positivo = separar por tipo é melhor** |
-| `modelo_com_intervencao` | str | 0 % | Vencedor usado no lado `com_intervencao` |
-| `modelo_sem_intervencao` | str | 0 % | Vencedor usado no lado `sem_intervencao` |
-| `modelo_total` | str | 0 % | Vencedor usado no lado do modelo único |
+| `modelo_com_intervencao` | str | 0 % | **Mudou de formato.** Modelos usados no lado `com_intervencao`, um por prioridade — lista separada por vírgula (ex.: `ETS, SARIMAX`), porque a escolha por série pode dar um vencedor diferente em cada prioridade |
+| `modelo_sem_intervencao` | str | 0 % | Idem, para `sem_intervencao` |
+| `modelo_total` | str | 0 % | Idem, para o lado do modelo único treinado sobre o total |
 | `separacao_vence` | bool | 0 % | `vantagem_da_separacao > 0` |
 
-### O resultado — e ele mudou de sinal em relação à versão anterior
+### O resultado
 
 | Horizonte | Soma de 2 modelos | Modelo único | Vantagem da separação |
 |---|---|---|---|
-| D+1 (geral) | 85,26 | **82,21** | **−3,7 %** |
-| D+7 (geral) | **552,19** | 555,80 | **+0,7 %** |
+| D+1 (geral) | 62,26 | **59,62** | **−4,4 %** |
+| D+7 (geral) | **542,23** | 521,75 | **−3,9 %** |
 
-A versão anterior reportava +11,3 % e +14,7 %, com a conclusão de que **separar por tipo
-compensava nos dois horizontes**. Com o desenho novo e as janelas de teste maiores, a vantagem
-praticamente desaparece: em D+1 o modelo único passa a vencer por 3,7 %, e em D+7 a separação
-ganha por menos de 1 %, o que é ruído.
+Com a escolha por série, o modelo único vence nos dois horizontes na leitura geral — mas o
+resultado é **oposto por prioridade**, e é aí que a decisão de negócio realmente se apoia:
 
-**Leitura honesta: esta tabela não sustenta mais uma recomendação em nenhuma direção.** Por
-prioridade o quadro é misto — a separação vence com folga em P2 (+22,0 % em D+1, +35,1 % em D+7)
-e perde em P3 nos dois horizontes. O que a mudança sugere é que boa parte do ganho anterior vinha
-do tamanho pequeno da janela de teste, não do grão.
+| Prioridade | Horizonte | Vantagem da separação |
+|---|---|---|
+| P2 | D+1 | −14,0 % |
+| P2 | D+7 | **+47,0 %** |
+| P3 | D+1 | −3,1 % |
+| P3 | D+7 | −11,6 % |
+| P4 | D+1 | −2,0 % |
+| P4 | D+7 | −1,7 % |
 
-⚠️ **Ressalva de tamanho de amostra.** São 84 pontos em D+1 e 66 em D+7 — o dobro do que a versão
-anterior tinha, e ainda assim indicativo, não conclusivo. A decisão de negócio de separar
-`com_intervencao` de `sem_intervencao` continua se sustentando pelo lado da **interpretação** (são
-dinâmicas diferentes, e a quebra de setembro está inteiramente numa delas); pelo lado da
-**previsão**, o número não decide.
+Fora de P2‑D+7, a vantagem de separar por tipo é pequena nos dois sentidos — dentro do que 22 a 28
+pontos de teste conseguem decidir.
+
+**Leitura honesta: esta tabela não sustenta uma recomendação forte em nenhuma direção**, e não
+sustentava nas duas versões anteriores também. A decisão de negócio de separar `com_intervencao`
+de `sem_intervencao` continua se apoiando na **interpretação** (são dinâmicas diferentes, e a
+quebra de setembro está inteiramente numa delas), não neste número.
+
+⚠️ **Ressalva de tamanho de amostra.** 84 pontos em D+1 e 66 em D+7 — pouco para decidir por
+prioridade, e a coluna `n` desta tabela está aqui exatamente para lembrar disso antes de qualquer
+leitura mais forte que a que está escrita acima.
 
 ---
 
