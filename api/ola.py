@@ -327,6 +327,111 @@ def _data_cruzamento(proximo, acumulado, media_diaria, data, fim):
     return {"data": alvo.date().isoformat(), "dentro_da_projecao": bool(alvo <= fim)}
 
 
+# ==================================================================================================
+# Virada do ano — o painel principal
+# ==================================================================================================
+
+def painel_kpis(dominio, modelos, prioridade, origem):
+    """Chance de quebra dos dois KPIs a partir de `origem`, para o painel principal.
+
+    O acumulado das duas regras é ANUAL e zera em 01/01, então a pergunta tem até duas metades:
+
+    1. **ano corrente** — `painel()` até 31/12. A perna do modelo é o D+7 quando os 7 dias cabem
+       antes do fim do ano, e o D+1 quando não cabem (uma previsão de 7 dias não entra inteira num
+       período mais curto). Na origem 31/12 não há dia a projetar: o atingimento é o final.
+    2. **ano novo** — só quando D+1..D+7 atravessa 01/01. O acumulado parte de zero; a perna do
+       modelo é a fração do D+7 do grupo `total` que cai no ano novo, e o resto do ano é a taxa de
+       28 dias mantida constante, pelo mesmo Monte Carlo. É ritmo, não previsão de um ano inteiro
+       — e a resposta diz isso.
+    """
+    passos = cfg.HORIZONTES["D+7"]
+    fim_ano = pd.Timestamp(year=origem.year, month=12, day=31)
+    dias_ate_fim = int((fim_ano - origem).days)
+    horizonte = "D+7" if dias_ate_fim >= passos else "D+1"
+
+    corrente = painel(dominio, modelos, prioridade, origem, horizonte, fim_ano)
+    if not any(r["tem_meta"] for r in corrente["regras"].values()):
+        return {"prioridade": prioridade, "tem_meta": False, "regras": corrente["regras"],
+                "avisos": corrente["avisos"]}
+
+    # Ano novo: só existe quando a semana prevista atravessa a virada.
+    dias_no_ano_novo = passos - dias_ate_fim
+    inicio_novo = fim_ano + pd.Timedelta(days=1)
+    fim_novo = pd.Timestamp(year=origem.year + 1, month=12, day=31)
+    taxas = _taxas(dominio, prioridade, origem)
+    modelo_novo = None
+    if dias_no_ano_novo > 0:
+        perna = _perna_do_modelo(dominio, modelos, prioridade, origem, "D+7", taxas)
+        modelo_novo = dict(perna, dias_cobertos=0)
+        if perna["fechados_previstos"] is not None:
+            fracao = dias_no_ano_novo / passos
+            modelo_novo.update(fechados_previstos=perna["fechados_previstos"] * fracao,
+                               desvio_fechados=perna["desvio_fechados"] * fracao,
+                               dias_cobertos=dias_no_ano_novo)
+
+    regras = {}
+    for nome, spec in REGRAS.items():
+        atual = corrente["regras"][nome]
+        if not atual["tem_meta"]:
+            regras[nome] = atual
+            continue
+        dias_restantes = corrente["dias_projetados"]
+        regras[nome] = {
+            "tem_meta": True,
+            "unidade": spec["unidade"],
+            "descricao": spec["descricao"],
+            "cortes": atual["cortes"],
+            "escala": cfg.ESCALA_OLA,
+            "ano_corrente": {
+                "ano": origem.year,
+                "acumulado_hoje": atual["acumulado_hoje"],
+                "atingimento_hoje_pct": atual["atingimento_hoje_pct"],
+                "dias_restantes": dias_restantes,
+                "fechado": dias_restantes == 0,
+                "atingimento_esperado_pct": atual["projecao"]["atingimento_esperado_pct"],
+                "probabilidade_de_piorar": atual["probabilidade_de_piorar"],
+                "proximo_corte": atual["proximo_corte"],
+                "data_provavel_de_cruzamento": atual["data_provavel_de_cruzamento"],
+                "faixa_estourada": atual["faixa_estourada"],
+            },
+            "ano_novo": (None if modelo_novo is None else
+                         _ano_novo(nome, atual["cortes"], taxas, modelo_novo,
+                                   inicio_novo, fim_novo)),
+        }
+
+    avisos = list(corrente["avisos"])
+    if modelo_novo is not None:
+        avisos.append({
+            "nivel": "atencao",
+            "texto": (f"A leitura de {inicio_novo.year} parte do acumulado zerado em "
+                      f"{inicio_novo:%d/%m/%Y}: os primeiros {dias_no_ano_novo} dias vêm da "
+                      f"previsão D+7 e o resto do ano é a taxa diária das últimas "
+                      f"{cfg.JANELA_TAXA_DIAS} dias mantida constante. É ritmo, não previsão de "
+                      "um ano inteiro."),
+        })
+    return {"prioridade": prioridade, "tem_meta": True, "regras": regras, "avisos": avisos}
+
+
+def _ano_novo(nome, cortes, taxas, modelo, inicio, fim):
+    """Acumulado do ano novo, de zero até `fim`: chance de sair da faixa de topo e quando."""
+    dias = int((fim - inicio).days) + 1
+    incremento = _sortear_incremento(nome, taxas, modelo, dias)
+    topo = atingimento(0.0, cortes)
+    faixas = [atingimento(x, cortes) for x in incremento["amostras"]]
+    return {
+        "ano": inicio.year,
+        "atingimento_inicial_pct": topo,
+        "probabilidade_de_quebra": round(float(np.mean([f < topo for f in faixas])), 3),
+        "acumulado_esperado": round(incremento["media"], 1),
+        "atingimento_esperado_pct": atingimento(incremento["media"], cortes),
+        "primeiro_corte": float(cortes[0]),
+        "data_provavel_de_cruzamento": _data_cruzamento(
+            float(cortes[0]), 0.0, incremento["media_diaria"],
+            inicio - pd.Timedelta(days=1), fim),
+        "distribuicao_de_faixas": _distribuicao(faixas),
+    }
+
+
 def _distribuicao(faixas_sorteadas):
     serie = pd.Series(faixas_sorteadas)
     contagem = serie.value_counts(normalize=True).sort_index(ascending=False)

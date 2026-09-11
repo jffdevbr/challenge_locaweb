@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="logo (placeholder)">
+  <!-- PLACEHOLDER até o logo da marca chegar. Mesmo nome de arquivo = troca sem mexer no HTML. -->
+  <rect x="1" y="1" width="30" height="30" rx="8" fill="none" stroke="currentColor" stroke-width="2" opacity=".9"/>
+  <path d="M7 21 L12 15 L16 18 L21 10 L25 13" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

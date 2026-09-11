@@ -13,9 +13,11 @@ mesma série:
 | `sem_intervencao` | abriu e fechou no monitoramento automático | volume alto, comportamento próprio, quebra estrutural em setembro/2025 |
 | `total` | a soma das duas fatias | **construído**, não é uma terceira categoria do dado |
 
-O produto final é uma API REST com página web que recebe *data + prioridade + horizonte* e devolve
-a previsão dos três grupos, mais três painéis de negócio: risco de cumprimento de OLA,
-dimensionamento de capacidade e detecção de dias atípicos.
+O produto final é uma API REST com duas páginas web. O **painel** (`/`) mostra os números
+principais de um dia entre 01/09 e 31/12/2025: com e sem intervenção empilhados, com o D+1 sobre
+os últimos 14 dias e o D+7 sobre as últimas 4 semanas, e a chance de quebra dos KPIs de OLA. Os **detalhes** (`/detalhe`) recebem *data + prioridade +
+horizonte* e devolvem a previsão dos três grupos, mais três painéis de negócio: risco de
+cumprimento de OLA, dimensionamento de capacidade e detecção de dias atípicos.
 
 ---
 
@@ -42,9 +44,9 @@ teste (limitação de dado, não de modelo). O detalhamento por série está em
 [`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md) e em
 [`docs/CONTRATO_MODELOS.md`](docs/CONTRATO_MODELOS.md) §8.
 
-> ⚠️ **`api/` ainda serve o contrato anterior.** Esta safra introduziu `ETS` e `Theta` ao lado do
-> `SARIMAX`, e o serving (`api/previsao.py`) e o portão de qualidade (`tests/test_reproducao.py`)
-> não foram atualizados para eles — ver `docs/CONTRATO_MODELOS.md` §7.
+A página de detalhes e a API mostram esse fato ao lado de cada previsão. O painel principal é a
+única exceção, por decisão da autora: ele mostra o número do modelo sem a marca de ingênuo e
+aponta para os detalhes (ver `docs/CONTRATO_MODELOS.md` §8).
 
 ---
 
@@ -72,8 +74,8 @@ Pipeline em camadas, cada seta é um notebook:
         ▼
    3_gold_data/ (4 tabelas)  +  models/ (18 artefatos .pkl/.json + manifesto.csv)
         │
-        │  api/     FastAPI + página web — serving por apply(refit=False) + forecast
-        │           ⚠️ ainda só sabe carregar SARIMAX — ver docs/CONTRATO_MODELOS.md §7
+        │  api/     FastAPI + painel (/) e detalhes (/detalhe) — serve SARIMAX, ETS e Theta
+        │           refiltrando o estado até a origem (docs/CONTRATO_MODELOS.md §7)
         ▼
    http://localhost:8000
 ```
@@ -83,9 +85,9 @@ série com o seu próprio vencedor: **8 `SARIMAX`, 7 `Theta`, 3 `ETS`** nesta sa
 por um backtest de origem móvel dentro do treino, nunca pelo MAE do teste. Nenhum Prophet e nenhum
 LSTM foi escolhido; as duas famílias competem só como referência medida no hold-out, fora da
 disputa (retreiná-las sob a mesma validação seria caro demais para o que renderam nas safras
-anteriores). `ETS` e `Theta` vão para `models/` em `.json` — não são `SARIMAXResults` — e é por
-isso que servi-los exige o caminho novo descrito em `docs/CONTRATO_MODELOS.md` §7, ainda não escrito
-em `api/`.
+anteriores). `ETS` e `Theta` vão para `models/` em `.json` — não são `SARIMAXResults` — e são
+servidos pelo caminho descrito em `docs/CONTRATO_MODELOS.md` §7, implementado em
+`api/previsao.py`.
 
 ### Estrutura de pastas
 
@@ -213,10 +215,10 @@ de cada **série** (`grupo × prioridade × horizonte`) e exporta (§12.4) as 4 
 É o portão de qualidade: `test_reproducao.py` replica as 18 combinações a partir de `models/` e
 compara com `3_gold_data/g_previsoes.csv` (divergência máxima aceita: o arredondamento do próprio
 arquivo). `test_classificacao.py` cobre os selos de data nas fronteiras e `test_ola.py`, as regras
-de OLA.
+de OLA; `test_painel.py` cobre a rota do painel (intervalo de datas, pilha com + sem, etiqueta de
+período e virada do ano).
 
-> ⚠️ **Este teste hoje falha.** Ele foi escrito contra a safra anterior (só `ARIMA`/`SARIMA`), e o
-> manifesto atual tem `SARIMAX`/`ETS`/`Theta`. Ver `docs/CONTRATO_MODELOS.md` §7.
+Na safra atual o teste reproduz as 534 origens de teste das 18 séries, nas três famílias.
 
 ### 6. Subir a API
 
@@ -282,7 +284,7 @@ o código que descrevem:
 | [`1_bronze_data/data_dictionary.md`](1_bronze_data/data_dictionary.md) | grão do incidente: 23 colunas, cobertura temporal, sentinelas nulas, flags de validação |
 | [`2_silver_data/data_dictionary.md`](2_silver_data/data_dictionary.md) | as 17 tabelas silver, coluna a coluna, com as convenções de `regime` e `tipo_tratamento` |
 | [`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md) | desenho do treino, estudo de features, resultados e ressalvas — sem maquiagem |
-| [`models/manifesto.csv`](models/manifesto.csv) | qual linha de `g_avaliacao_modelos` justifica cada `.pkl` (`mae`, `mase`, `mae_ingenuo`, `ganho_vs_ingenuo`, `supera_ingenuo`, `corte_teste`, `configuracao`) |
+| [`models/manifesto.csv`](models/manifesto.csv) | qual linha de `g_avaliacao_modelos` justifica cada artefato (`familia`, `transformacao`, `exog`, `mae`, `mase`, `mae_ingenuo`, `ganho_vs_ingenuo`, `supera_ingenuo`, `corte_teste`, `configuracao`) |
 
 ---
 
@@ -291,8 +293,9 @@ o código que descrevem:
 Estão listadas aqui porque aparecem na tela e na resposta da API, e não devem ser descobertas por
 acidente:
 
-- **5 dos 6 cortes perdem para o baseline ingênuo** (tabela no topo). A tela marca
-  `✅ supera o ingênuo` / `❌ perde do ingênuo` ao lado de cada previsão.
+- **7 das 18 séries perdem para o baseline ingênuo** (tabela no topo). A página de detalhes marca
+  `✅ supera o ingênuo` / `❌ perde do ingênuo` ao lado de cada previsão, e a API devolve o fato
+  em `avisos`. O painel principal não mostra a marca, por decisão da autora.
 - **As faixas de OLA por volume estão estouradas.** Em 31/12/2025 a P2 fechou 15.649 contra um corte
   máximo de 6.337, e a P3 fechou 41.732 contra 24.277 — o atingimento é 0 % o ano inteiro. As faixas
   foram calibradas para outra escala e precisam de recalibração. A regra de **duração** é a que

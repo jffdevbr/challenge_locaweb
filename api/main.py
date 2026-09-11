@@ -10,6 +10,7 @@ import os
 import platform
 from contextlib import asynccontextmanager
 from datetime import date
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -137,7 +138,6 @@ def catalogo():
         "selos": [cfg.SELO_TREINO, cfg.SELO_EMBARGO, cfg.SELO_TESTE,
                   cfg.SELO_SEM_RESPOSTA, cfg.SELO_FORA_DA_JANELA, cfg.SELO_SEM_FEATURES],
         "manifesto": DOMINIO.manifesto.to_dict(orient="records"),
-        "paleta": cfg.PALETA,
     }
 
 
@@ -150,7 +150,9 @@ def features(data: str = Query(..., description="data de origem, AAAA-MM-DD"),
     _validar_prioridade(prioridade)
     _validar_horizonte(horizonte)
 
-    saida = {g: dom.features_do_dia(DOMINIO, g, prioridade, d, horizonte) for g in cfg.GRUPOS}
+    saida = {g: dom.features_do_dia(DOMINIO, g, prioridade, d,
+                                    MODELOS.meta(g, prioridade, horizonte)["exog"])
+             for g in cfg.GRUPOS}
     if all(v is None for v in saida.values()):
         raise HTTPException(404, f"{data} está fora do histórico disponível")
     return {"data": data, "prioridade": prioridade, "horizonte": horizonte, "grupos": saida}
@@ -185,7 +187,8 @@ def previsao(data: str = Query(..., description="data de origem, AAAA-MM-DD"),
         "data": data,
         "prioridade": prioridade,
         "horizonte": horizonte,
-        "entradas": dom.features_do_dia(DOMINIO, "total", prioridade, d, horizonte),
+        "entradas": dom.features_do_dia(DOMINIO, "total", prioridade, d,
+                                        MODELOS.meta("total", prioridade, horizonte)["exog"]),
         "cards": cards,
         "soma_dos_dois": _soma_dos_dois(cards),
         "grafico": _serie_grafico(prioridade, horizonte, d, dias_grafico, cards),
@@ -276,6 +279,120 @@ def _avisos_previsao(cards):
 
 
 # ==================================================================================================
+# Painel principal
+# ==================================================================================================
+
+# Empilhados na tela: a pilha prevista é a soma dos dois modelos. O `total` fica em /detalhe.
+GRUPOS_PAINEL = ["com_intervencao", "sem_intervencao"]
+
+
+@app.get("/api/painel", tags=["painel"])
+def painel_principal(origem: str = Query(..., description=f"data de origem, AAAA-MM-DD, de "
+                                                          f"{cfg.PAINEL_INICIO} a {cfg.PAINEL_FIM}")):
+    """Tudo o que o painel principal mostra numa origem, para as 3 prioridades.
+
+    Com e sem intervenção vêm separados para a tela empilhar: o histórico diário e semanal, as
+    previsões D+1 e D+7 de cada um, os KPIs de OLA e uma etiqueta dizendo em que período (treino,
+    teste, produção) a data cai. O filtro de prioridade é feito no navegador; o resultado é
+    memorizado por origem.
+
+    O bloco `avisos` carrega, como em toda rota, as séries cujo modelo não supera o ingênuo no
+    teste. A página principal escolhe não renderizá-lo; a página de detalhes renderiza.
+    """
+    d = _validar_data(origem)
+    if not pd.Timestamp(cfg.PAINEL_INICIO) <= d <= pd.Timestamp(cfg.PAINEL_FIM):
+        raise HTTPException(422, f"origem {origem} fora do painel — use de {cfg.PAINEL_INICIO} "
+                                 f"a {cfg.PAINEL_FIM}")
+    return _painel(d.date().isoformat())
+
+
+@lru_cache(maxsize=256)
+def _painel(origem):
+    d = pd.Timestamp(origem)
+    previsoes = {(g, p, h): prev.prever(DOMINIO, MODELOS, g, p, h, d)
+                 for g in GRUPOS_PAINEL for p in cfg.PRIORIDADES for h in cfg.HORIZONTES}
+    return {
+        "origem": origem,
+        "intervalo": {"inicio": cfg.PAINEL_INICIO, "fim": cfg.PAINEL_FIM},
+        "situacao": _situacao_painel(previsoes),
+        "prioridades": {p: _bloco_prioridade(p, d, previsoes) for p in cfg.PRIORIDADES},
+        "kpis": {p: mod_ola.painel_kpis(DOMINIO, MODELOS, p, d) for p in cfg.PRIORIDADES},
+        "avisos": _avisos_painel(previsoes),
+    }
+
+
+def _bloco_prioridade(p, d, previsoes):
+    """Pilhas realizadas (diária e semanal) e as duas previsões empilhadas, de uma prioridade."""
+    series = {g: DOMINIO.serie(g, p).set_index("data") for g in GRUPOS_PAINEL}
+
+    def pilha(data, coluna):
+        return {g.split("_")[0]: _num(series[g].at[data, coluna]) for g in GRUPOS_PAINEL}
+
+    dias = pd.date_range(end=d, periods=cfg.PAINEL_DIAS_D1, freq="D")
+    # Semanas fechando em D, D-7, D-14...: `soma7` de cada fim é a semana inteira realizada.
+    fins = [d - pd.Timedelta(days=cfg.PASSO_MAXIMO * k)
+            for k in range(cfg.PAINEL_SEMANAS_D7 - 1, -1, -1)]
+    return {
+        "diario": [{"data": t.date().isoformat(), **pilha(t, "abertos")} for t in dias],
+        "semanal": [{"inicio": (t - pd.Timedelta(days=cfg.PASSO_MAXIMO - 1)).date().isoformat(),
+                     "fim": t.date().isoformat(), **pilha(t, "soma7")} for t in fins],
+        "d1": _previsao_empilhada(previsoes, p, "D+1", d),
+        "d7": _previsao_empilhada(previsoes, p, "D+7", d),
+    }
+
+
+def _previsao_empilhada(previsoes, p, horizonte, d):
+    partes = {g.split("_")[0]: previsoes[(g, p, horizonte)] for g in GRUPOS_PAINEL}
+    reais = [r["real"] for r in partes.values()]
+    return {
+        "inicio": (d + pd.Timedelta(days=1)).date().isoformat(),
+        "fim": (d + pd.Timedelta(days=cfg.HORIZONTES[horizonte])).date().isoformat(),
+        "previsto": round(sum(r["previsao"] for r in partes.values()), 2),
+        "real": None if None in reais else sum(reais),
+        **{k: {"previsao": r["previsao"], "banda": r["banda"], "real": r["real"],
+               "familia": r["familia"]}
+           for k, r in partes.items()},
+    }
+
+
+def _situacao_painel(previsoes):
+    """Uma etiqueta para a data: em que período de treino/teste as quatro previsões caem.
+
+    O selo depende do grupo e do horizonte, não da prioridade — basta olhar uma delas.
+    """
+    p = cfg.PRIORIDADES[0]
+    selos = {(g, h): previsoes[(g, p, h)]["situacao"]["selo"]
+             for g in GRUPOS_PAINEL for h in cfg.HORIZONTES}
+    valores = set(selos.values())
+    if valores == {cfg.SELO_SEM_RESPOSTA}:
+        chave, texto = "produção", "ainda não existe real para comparar"
+    elif valores <= {cfg.SELO_TESTE, cfg.SELO_SEM_RESPOSTA}:
+        chave, texto = "teste", "o modelo nunca viu estes dias no ajuste"
+    elif cfg.SELO_TREINO in valores:
+        chave, texto = "treino", "o modelo viu estes dias no ajuste — o acerto aqui é otimista"
+    else:
+        chave, texto = "fronteira", "entre treino e teste — parte das previsões está no embargo"
+    return {"chave": chave, "texto": texto,
+            "detalhe": [{"grupo": g, "horizonte": h, "selo": s} for (g, h), s in selos.items()]}
+
+
+def _avisos_painel(previsoes):
+    avisos = []
+    for (g, p, h), r in previsoes.items():
+        if not r["desempenho_no_teste"]["supera_ingenuo"]:
+            avisos.append({
+                "grupo": g, "prioridade": p, "horizonte": h, "nivel": "critico",
+                "texto": (f"{r['familia']} não supera o ingênuo no teste "
+                          f"({r['desempenho_no_teste']['ganho_vs_ingenuo']:+.1f} % de MAE, "
+                          f"regra '{r['desempenho_no_teste']['regra_ingenua']}')."),
+            })
+        if r["usou_fallback"]:
+            avisos.append({"grupo": g, "prioridade": p, "horizonte": h, "nivel": "critico",
+                           "texto": "A projeção caiu no fallback (último valor)."})
+    return avisos
+
+
+# ==================================================================================================
 # Painéis de negócio
 # ==================================================================================================
 
@@ -336,4 +453,11 @@ app.mount("/static", StaticFiles(directory=cfg.CAMINHO_WEB), name="static")
 
 @app.get("/", include_in_schema=False)
 def pagina():
+    """Painel principal — os números da virada do ano."""
     return FileResponse(cfg.CAMINHO_WEB / "index.html")
+
+
+@app.get("/detalhe", include_in_schema=False)
+def pagina_detalhe():
+    """Página de detalhes — qualquer data, selos, ressalvas e os três painéis de negócio."""
+    return FileResponse(cfg.CAMINHO_WEB / "detalhe.html")

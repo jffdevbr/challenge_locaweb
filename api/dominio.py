@@ -172,11 +172,33 @@ def _montar_series(fato, calendario, calendario_janela):
             assert (s.data.diff().dropna() == pd.Timedelta(days=1)).all(), \
                 f"{grupo} P{p}: grade de datas com buraco"
 
+            idx_janela = int(s.index[s.na_janela][0])
+            s = pd.concat([s, _defasadas(s, idx_janela)], axis=1)
             s.attrs["grupo"] = grupo
             s.attrs["prioridade"] = p
-            s.attrs["idx_janela"] = int(s.index[s.na_janela][0])
+            s.attrs["idx_janela"] = idx_janela
             series[(grupo, p)] = s
     return series
+
+
+def _defasadas(s, idx_janela):
+    """`<c>_obs<h>`: a coluna `c` defasada de `h` dias — exógena admissível de estado observado.
+
+    Replica `acrescentar_defasadas` do notebook, inclusive no detalhe que muda o número: lá a
+    série é recortada na janela ANTES de defasar, então as `h` primeiras linhas da janela são
+    preenchidas de trás para frente (`bfill`) com valores da própria janela. Aqui a defasagem é
+    feita sobre a fatia da janela do mesmo jeito; antes da janela (só `FORA DA JANELA`), sobre o
+    histórico inteiro.
+    """
+    colunas = {}
+    for c in cfg.FEATURES_OBSERVADAS:
+        if c not in s.columns:
+            continue
+        for h in cfg.DEFASAGENS:
+            antes = s[c].iloc[:idx_janela].shift(h)
+            na_janela = s[c].iloc[idx_janela:].shift(h).bfill()
+            colunas[f"{c}_obs{h}"] = pd.concat([antes, na_janela])
+    return pd.DataFrame(colunas, index=s.index)
 
 
 # ==================================================================================================
@@ -286,8 +308,11 @@ def _selo(selo, explicacao, prever, tem_real, i=None, i_alvo=None, data_alvo=Non
 # Features do dia
 # ==================================================================================================
 
-def features_do_dia(dominio, grupo, prioridade, data, horizonte):
-    """As entradas que o modelo e a tela veem naquele dia, agrupadas por origem."""
+def features_do_dia(dominio, grupo, prioridade, data, exog=()):
+    """As entradas que o modelo e a tela veem naquele dia, agrupadas por origem.
+
+    `exog` é a lista de exógenas do artefato daquela série (sidecar `.config.json`).
+    """
     i = dominio.indice_da_data(grupo, prioridade, data)
     if i is None:
         return None
@@ -297,7 +322,6 @@ def features_do_dia(dominio, grupo, prioridade, data, horizonte):
     def bloco(colunas):
         return {c: _limpo(linha[c]) for c in colunas if c in s.columns}
 
-    exog = cfg.EXOG_MODELO[horizonte]
     return {
         "serie": {"abertos": _limpo(linha["abertos"]), "soma7": _limpo(linha["soma7"])},
         "calendario": bloco(cfg.FEATURES_CALENDARIO),

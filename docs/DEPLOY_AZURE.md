@@ -212,6 +212,39 @@ curl "http://locaweb-previsao-563445.brazilsouth.azurecontainer.io:8000/api/prev
 # {"data":"2025-12-15","prioridade":3,"horizonte":"D+7", ...}
 ```
 
+Com a versão atual da API, as páginas ficam em `http://…:8000/` (painel principal, aceita
+`?data=AAAA-MM-DD`) e `http://…:8000/detalhe`, e a rota do painel é
+`/api/painel?origem=AAAA-MM-DD`. Ver [`README_API.md`](README_API.md).
+
+---
+
+## Atualizar o que está no ar (safra nova de modelos ou mudança em `api/`)
+
+A imagem leva código **e** dado (modelos + CSVs), então qualquer retreino ou mudança de tela exige
+um build novo no ACR e a recriação do container. O ACI não percebe sozinho que a tag mudou.
+
+```bash
+export PYTHONIOENCODING=utf-8 MSYS_NO_PATHCONV=1
+az acr build --registry acrlocaweb563445 --image lw-previsao:1.0 --file Dockerfile .
+az container restart --resource-group rg-locaweb-previsao --name aci-locaweb-previsao
+```
+
+O `restart` baixa de novo a imagem da tag. Se ele não pegar a imagem nova, rodar de novo
+`bash azure/provisionar.sh` recria o container no lugar, porque os passos são idempotentes.
+
+**Estado registrado aqui:** a execução documentada acima é **anterior** à safra atual de modelos
+e ao painel novo. Para levar a versão atual (SARIMAX, ETS e Theta; páginas `/` e `/detalhe`), o
+procedimento é só o bloco acima, e não precisa de nenhum ajuste de infraestrutura:
+
+- o `.dockerignore` já deixa `models/*.json` (ETS/Theta e sidecars) entrar no contexto do build;
+- `requirements_api_container.txt` não mudou, porque ETS e Theta vêm no mesmo statsmodels pinado;
+- os recursos do ACI (1 vCPU, 1,5 GB) continuam suficientes. O Theta reajusta a cada chamada, e
+  o painel calcula 12 previsões mais os KPIs por data (~0,5 s localmente) e memoriza o resultado;
+- o healthcheck do `Dockerfile` e o `/health` não mudaram (18 modelos, 9 séries).
+
+⚠️ Esse reimplante **ainda não foi executado nem verificado na Azure**. Depois de rodar, conferir
+`/health`, a página `/` e `AppRequests` no Log Analytics, como no passo 5.
+
 ---
 
 ## Desligar tudo

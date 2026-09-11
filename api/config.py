@@ -35,16 +35,28 @@ JANELA = {
 INICIO_R2 = "2025-01-01"   # fim do artefato de extração
 INICIO_R3 = "2025-09-01"   # entrada do pipeline de monitoramento automático
 
-# --- Exógenas de cada horizonte (só as famílias SARIMA recebem) ---------------------------------
-EXOG_MODELO = {
-    "D+1": ["feriado", "vespera_feriado", "pos_feriado"],
-    "D+7": ["feriados_7d", "vesperas_7d"],
-}
+# --- Famílias servidas ------------------------------------------------------------------------
+# A lista de exógenas NÃO mora aqui: varia por série e vem do sidecar `.config.json` de cada
+# artefato (§3 do contrato). Só a família SARIMAX recebe exógena.
+FAMILIAS = ("SARIMAX", "ETS", "Theta")
+
+# Trava de sanidade do treino (`protocolo.avaliar`): teto = 2 * max(série[D-27..D]) + 10.
+TETO_JANELA_DIAS = 28
+
+# --- Painel principal ---------------------------------------------------------------------------
+# Datas aceitas como "hoje": o intervalo em que com_intervencao e sem_intervencao estão os dois
+# dentro da própria janela. Antes de 01/09 o modelo sem_intervencao só extrapola sobre o regime
+# pré-automação.
+PAINEL_INICIO = "2025-09-01"
+PAINEL_FIM = "2025-12-31"
+PAINEL_DIAS_D1 = 14        # dias realizados no gráfico do D+1
+PAINEL_SEMANAS_D7 = 4      # semanas realizadas no gráfico do D+7
 
 # --- Features mostradas na tela -----------------------------------------------------------------
+# `num_dia_util` não é mostrada no notebook, mas é exógena candidata do D+1 e precisa estar na série.
 FEATURES_CALENDARIO = [
     "dia_semana", "fim_de_semana", "dia_util", "feriado",
-    "vespera_feriado", "pos_feriado", "dia_mes",
+    "vespera_feriado", "pos_feriado", "dia_mes", "num_dia_util",
     "sen_semana", "cos_semana", "sen_ano", "cos_ano",
 ]
 FEATURES_JANELA = ["feriados_7d", "dias_uteis_7d", "vesperas_7d", "feriados_j7", "dias_uteis_j7"]
@@ -54,6 +66,10 @@ FEATURES_EXOGENAS = [
     "abertos_sem_classificacao",
     "ics_distintos", "times_distintos", "descricoes_distintas",
 ]
+# Estado observado em D que pode virar exógena — sempre DEFASADO, como `<c>_obs<h>` (notebook,
+# `acrescentar_defasadas`): a linha D+k carrega o valor de D+k-h, nunca posterior à origem.
+FEATURES_OBSERVADAS = FEATURES_EXOGENAS + ["soma7"]
+DEFASAGENS = sorted(set(HORIZONTES.values()))
 # Razões do grupo `total`: numerador e denominador somados ANTES de dividir.
 COMPONENTES_RAZAO = {
     "inc_por_ic": ("abertos", "ics_distintos"),

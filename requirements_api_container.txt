@@ -18,5 +18,5 @@ azure-monitor-opentelemetry==1.6.4
 azure-monitor-opentelemetry-exporter==1.0.0b50
 
 # Ausentes de propósito, e é o que segura a imagem: torch, prophet, cmdstanpy, xgboost,
-# scikit-learn, matplotlib. Nenhum modelo vencedor precisa deles — os 18 artefatos são todos
-# ARIMA/SARIMA do statsmodels.
+# scikit-learn, matplotlib. Nenhum modelo vencedor precisa deles — os 18 artefatos são SARIMAX,
+# ETS e Theta, todos do statsmodels.

@@ -4,8 +4,9 @@
 # a imagem já pronta (Dockerfile na raiz do projeto).
 #
 # Como rodar, a partir da raiz do repositório — o `az acr build` do PASSO 2 sobe o contexto de
-# build local, e ele só tem os CSVs e .pkl das camadas se você rodou os notebooks antes (nada de
-# dado está versionado — ver CLAUDE.md):
+# build local, e ele só tem os CSVs das camadas e os artefatos de models/ (.pkl SARIMAX, .json
+# ETS/Theta e sidecars) se você rodou os notebooks antes (nada de dado está versionado — ver
+# CLAUDE.md):
 #
 #   cd challenge_locaweb
 #   bash azure/provisionar.sh
@@ -127,13 +128,15 @@ echo
 echo "=================================================================================="
 echo "PRONTO"
 echo "=================================================================================="
-echo "API:              http://${FQDN}:8000"
+echo "Painel:           http://${FQDN}:8000/            (ex.: /?data=2025-12-20)"
+echo "Detalhes:         http://${FQDN}:8000/detalhe"
 echo "Docs (OpenAPI):   http://${FQDN}:8000/docs"
 echo "Health:           http://${FQDN}:8000/health"
 echo "Resource Group:   ${GRUPO_RECURSOS}"
 echo
 echo "Teste rápido:"
 echo "  curl http://${FQDN}:8000/health"
+echo "  curl \"http://${FQDN}:8000/api/painel?origem=2025-12-20\""
 echo "  curl \"http://${FQDN}:8000/api/previsao?data=2025-12-15&prioridade=3&horizonte=D%2B7\""
 echo
 echo "Para desligar tudo (evitar consumo de crédito): bash azure/limpar.sh"

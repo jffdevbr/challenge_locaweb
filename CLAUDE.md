@@ -10,8 +10,11 @@ automático (`sem_intervencao`).
 - **Idioma:** todo código, comentário, docstring, coluna e texto de tela em **português**.
 - **Guia de desenho:** *simples que funciona*. Onde o simples empata com o complexo, o simples vence.
 - **Nunca ler notebook com `Read`** — `model_training.ipynb` tem 3,7 MB. Ver *Ler um notebook* abaixo.
-- **Honestidade sobre resultado:** 5 dos 6 modelos vencedores **perdem para o baseline ingênuo**.
-  Isso está medido, documentado e não deve ser suavizado em nenhuma entrega.
+- **Honestidade sobre resultado:** 7 das 18 séries têm vencedor que **perde para o baseline
+  ingênuo** (11 superam). Isso está medido e documentado, e não pode ser suavizado nos
+  documentos, na API (bloco `avisos` de toda rota) nem na página `/detalhe`. Única exceção,
+  decidida pela autora em 2026-09-10: o painel principal (`/`) mostra sempre o número do modelo,
+  sem a marca "perde do ingênuo" — e aponta para `/detalhe`, onde a marca continua.
 
 ## Camadas de dado
 
@@ -21,7 +24,7 @@ automático (`sem_intervencao`).
 | `1_bronze_data/` | `b_incidentes.csv`, grão do incidente | `1_bronze_data/data_dictionary.md` |
 | `2_silver_data/` | fatos e dimensões diários | `2_silver_data/data_dictionary.md` |
 | `3_gold_data/` | previsões e avaliação dos modelos | `3_gold_data/data_dictionary.md` |
-| `models/` | 18 `.pkl` dos vencedores + `manifesto.csv` | `docs/CONTRATO_MODELOS.md` |
+| `models/` | 18 vencedores (`.pkl` SARIMAX, `.json` ETS/Theta) + sidecars `.config.json` + `manifesto.csv` | `docs/CONTRATO_MODELOS.md` |
 
 Tabelas mais usadas:
 
@@ -42,7 +45,7 @@ datas como string ISO `YYYY-MM-DD` (sem hora, sem fuso). Ler sempre com
 
 ## ⚠️ Nada de dado está versionado
 
-`.gitignore` exclui **todas** as CSVs das camadas 0–3 e **todos** os `.pkl`. Quem clona o
+`.gitignore` exclui **todas** as CSVs das camadas 0–3, **todos** os `.pkl` e `models/*.json`. Quem clona o
 repositório recebe só código e documentação. Consequências:
 
 - não sugerir `git add` de dado ou de modelo;
@@ -65,15 +68,16 @@ O `PYTHONIOENCODING=utf-8` não é opcional: sem ele o console do Windows quebra
 
 ## Modelos — o essencial
 
-Os 18 artefatos de `models/` são **todos** `SARIMAXResults` do statsmodels (nenhum Prophet, nenhum
-LSTM sobreviveu à escolha). Servir é: carregar o `.pkl`, refiltrar o estado com o dado real até a
-origem `D` e ler o **último** passo da projeção.
+Os 18 artefatos de `models/` são de **três famílias do statsmodels**, um vencedor por série:
+8 `SARIMAX` (`.pkl`), 7 `Theta` e 3 `ETS` (`.json`). Nenhum Prophet nem LSTM foi escolhido.
+Servir é: refiltrar o estado com o dado real até a origem `D` (SARIMAX `res.apply(refit=False)`,
+ETS `smooth(params)`; o Theta reajusta a cada chamada) e ler o **último** passo da projeção.
 
-```python
-res = sm.load("models/com_intervencao_P2_D1_SARIMA.pkl")
-previsao = res.apply(historico_ate_D, exog=exog_ate_D, refit=False) \
-              .forecast(steps=passos, exog=exog_futuro)[-1]
-```
+O que não está no artefato e muda o número sem erro nenhum vem do sidecar `.config.json`:
+`transformacao` (`log1p` antes, `expm1` depois), a lista de exógenas **por série** e a
+padronização delas (`exog_centro`/`exog_escala`). Mais a trava `2·max(série[D-27..D]) + 10`. Tudo
+isso está implementado em `api/previsao.py`, e `tests/test_reproducao.py` reproduz as 534 origens
+de `g_previsoes.csv` — rodar depois de qualquer mudança no serving.
 
 `D+1` prevê a série `abertos` em 1 passo; `D+7` prevê a série `soma7` em 7 passos — e
 `soma7(D+7)` **é**, por identidade, o acumulado de `D+1` a `D+7`. Detalhes, janelas, cortes e

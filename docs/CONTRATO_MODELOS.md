@@ -4,11 +4,10 @@ Fonte da verdade para qualquer código que consuma `models/`. Escrito para dispe
 `notebooks/model_training.ipynb` (3,7 MB) — o que este documento afirma foi extraído de lá (§7.2 e
 §12.4) e **verificado contra `3_gold_data/g_avaliacao_modelos.csv` e `models/manifesto.csv`**.
 
-> ⚠️ **O contrato mudou nesta safra — `api/` ainda não foi atualizada para ele.** A safra anterior
-> exportava só `SARIMAXResultsWrapper` em pickle. Esta exporta **três famílias**, e 10 dos 18
-> artefatos não são mais pickle de statsmodels. Qualquer código de serving escrito contra a safra
-> anterior vai carregar 8 dos 18 arquivos e falhar silenciosamente nos outros 10 se não tratar
-> `.json`. Ver §1 e §7.
+> **O contrato mudou nesta safra, e `api/` já serve o contrato novo** (2026-09-10). A safra
+> anterior exportava só `SARIMAXResultsWrapper` em pickle. Esta exporta **três famílias**, e 10 dos
+> 18 artefatos não são pickle. Código de serving escrito contra a safra anterior carregaria 8 dos
+> 18 arquivos e falharia nos outros 10. Ver §1 e §7.
 
 ---
 
@@ -244,15 +243,23 @@ dois limites — quantil é equivariante a transformação monótona, então iss
 Replicar no serving o teto que o treino usa para conter raiz explosiva ou extrapolação absurda:
 `previsao = min(previsao, 2 * max(historico_ate_D[-28:]) + 10)`.
 
-### ⚠️ Verificado só parcialmente — `api/` está desatualizada para este contrato
+### Verificado — `api/previsao.py` reproduz a gold
 
-`tests/test_reproducao.py::test_manifesto_cobre_todo_o_grao` afirma
-`modelos.meta(...)["modelo"] in ("ARIMA", "SARIMA")` — essa asserção **falha** contra o manifesto
-atual, que tem `SARIMAX`, `ETS` e `Theta`. `api/previsao.py` foi escrita para a safra anterior e
-não tem caminho de carga para `.json`. Antes de subir esta safra: (1) estender `api/previsao.py`
-com os três blocos de código acima; (2) atualizar a asserção do teste; (3) rodar
-`test_reproducao.py` de novo e confirmar a mesma tolerância de 0,01 nas 18 séries. Nenhum desses
-três passos foi feito ainda.
+`api/previsao.py` implementa os três caminhos acima, com a transformação, a padronização das
+exógenas e a trava comuns às famílias. `tests/test_reproducao.py` reproduz as **534 origens de
+teste das 18 séries** de `g_previsoes.csv` com tolerância de 0,011 (a gold guarda 2 casas).
+
+Três detalhes de implementação que mudam o número e não aparecem nos blocos acima:
+
+- **Exógenas `_obs<h>`**: o notebook recorta a série na janela do grupo **antes** de defasar, e
+  preenche as `h` primeiras linhas com `bfill`. O serving defasa sobre a fatia da janela do mesmo
+  jeito (`api/dominio.py::_defasadas`). No futuro, `<c>_obs<h>` na linha `D+k` é `c` em `D+k-h`;
+  a carga recusa artefato com `h < passos`, que exigiria valor posterior à origem.
+- **ETS com `pd.Series`**: no statsmodels 0.14.6, `get_prediction` do ETS quebra com `ndarray`. O
+  ponto é idêntico nos dois casos; só o intervalo exige a `Series`.
+- **Intervalo nas três famílias**: SARIMAX `conf_int`, ETS `summary_frame` (`pi_lower`/`pi_upper`),
+  Theta `prediction_intervals`. Todos são construídos na escala transformada, depois passam por
+  `expm1` e pela mesma trava do ponto.
 
 ---
 
@@ -282,6 +289,12 @@ janela de teste (limitação de dado, não de modelo).
 Qualquer interface que sirva estes modelos deve mostrar esse fato ao lado da previsão, não
 escondê-lo. As colunas `mae_ingenuo`, `ganho_vs_ingenuo` e `supera_ingenuo` do `manifesto.csv`
 existem para isso.
+
+**Exceção registrada (decisão da autora, 2026-09-10):** o painel principal da API (`/`) mostra
+sempre o número do modelo, sem a marca de ingênuo — é a tela dos números "na cara do gol". Ela
+mostra, sim, uma etiqueta de período (treino / teste / produção), porque previsão in-sample com
+real ao lado passaria por acerto sem ser. A regra continua valendo para tudo o mais: a resposta de `/api/painel` carrega o
+fato no bloco `avisos`, e a página `/detalhe` o mostra ao lado de cada previsão.
 
 ---
 

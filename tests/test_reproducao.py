@@ -34,7 +34,7 @@ def test_manifesto_cobre_todo_o_grao(contexto):
     for grupo in cfg.GRUPOS:
         for p in cfg.PRIORIDADES:
             for h in cfg.HORIZONTES:
-                assert modelos.meta(grupo, p, h)["modelo"] in ("ARIMA", "SARIMA")
+                assert modelos.meta(grupo, p, h)["familia"] in cfg.FAMILIAS
 
 
 @pytest.mark.parametrize("grupo", cfg.GRUPOS)
@@ -51,11 +51,9 @@ def test_reproduz_previsoes_gold(contexto, grupo, prioridade, horizonte):
                  & (g.escolhido)]
     assert not esperado.empty, f"g_previsoes sem linhas escolhidas para {grupo} P{prioridade} {horizonte}"
 
-    passos = cfg.HORIZONTES[horizonte]
     divergencias = []
     for _, linha in esperado.iterrows():
-        # No D+1 a coluna `data` da gold é o dia PREVISTO; no D+7 é o dia de ORIGEM.
-        origem = linha.data - pd.Timedelta(days=passos) if horizonte == "D+1" else linha.data
+        origem = pd.Timestamp(linha.data_origem)
 
         r = prev.prever(dominio, modelos, grupo, prioridade, horizonte, origem)
         assert r["situacao"]["selo"] == cfg.SELO_TESTE, (

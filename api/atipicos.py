@@ -1,8 +1,8 @@
 """Detector de dia atípico — o real caiu fora da banda de previsão.
 
 Aqui o que importa não é acertar o ponto, é ter uma **banda calibrada**. Um modelo que erra o
-nível mas acerta a dispersão continua sendo um bom detector, e é isso que torna utilizáveis os 5
-dos 6 cortes em que a previsão perde para o baseline ingênuo.
+nível mas acerta a dispersão continua sendo um bom detector, e é isso que torna utilizáveis as 7
+das 18 séries em que a previsão perde para o baseline ingênuo.
 
 Quando o dia estoura a banda, a leitura de concentração diz que tipo de estouro foi: `inc_por_ic`
 alto significa muitos incidentes vindo de poucos itens de configuração — sinal de evento

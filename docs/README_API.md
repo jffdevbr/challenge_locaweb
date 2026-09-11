@@ -1,15 +1,15 @@
 # API de previsão de incidentes
 
-Camada de serving dos 18 modelos vencedores de `models/`: uma API REST e uma página web que
-recebem *data + prioridade + horizonte* e devolvem as features de entrada, a previsão dos três
-grupos, o valor real quando existe, e três painéis de negócio (risco de OLA, capacidade, dias
-atípicos).
+Camada de serving dos 18 modelos vencedores de `models/` — 8 `SARIMAX` (`.pkl`), 7 `Theta` e
+3 `ETS` (`.json`) — numa API REST e em duas páginas web:
 
-> ⚠️ **Desatualizado para a safra atual de modelos.** Esta página, o código de `api/previsao.py`
-> e `tests/test_reproducao.py` foram escritos para uma safra em que os 18 artefatos eram sempre
-> `SARIMAXResults` em `.pkl`. A safra atual tem `SARIMAX`, `ETS` e `Theta` — 10 dos 18 artefatos
-> são `.json`, não pickle — e nada abaixo que fale de carregar `.pkl` cobre os outros dois
-> formatos. Ver `docs/CONTRATO_MODELOS.md` §1 e §7 antes de mexer em `api/`.
+- **Painel (`/`)** — os números principais de um dia, entre 01/09 e 31/12/2025: com e sem
+  intervenção empilhados em dois gráficos (D+1 sobre os últimos 14 dias, D+7 sobre as últimas 4
+  semanas) e a chance de quebra dos dois KPIs de OLA. Filtro de prioridade; `/?data=AAAA-MM-DD`
+  abre direto numa data.
+- **Detalhes (`/detalhe`)** — qualquer data do histórico: features de entrada, previsão dos três
+  grupos com o selo da situação da data, valor real, desempenho contra o ingênuo, e os três
+  painéis de negócio (risco de OLA, capacidade, dias atípicos).
 
 O contrato dos modelos está em [`docs/CONTRATO_MODELOS.md`](CONTRATO_MODELOS.md). A visão geral do
 projeto e o passo a passo que produz o dado que esta API lê estão no
@@ -83,8 +83,10 @@ não como erro 500 no meio de uma demonstração.
 
 | Rota | O que devolve |
 |---|---|
-| `GET /` | a página |
+| `GET /` | o painel principal |
+| `GET /detalhe` | a página de detalhes |
 | `GET /docs` | OpenAPI interativo |
+| `GET /api/painel?origem=` | **painel** — de `2025-09-01` a `2025-12-31`: para as 3 prioridades, as pilhas com/sem realizadas (diária e semanal), as previsões D+1 e D+7 de cada tipo, os KPIs de OLA e a etiqueta da data; memorizado por origem |
 | `GET /health` | modelos carregados, séries montadas, versões |
 | `GET /api/catalogo` | datas válidas, janelas, cortes, regimes, o manifesto inteiro |
 | `GET /api/features?data=&prioridade=&horizonte=` | todas as features de entrada do dia, por grupo |
@@ -98,6 +100,7 @@ consumir a API por outro caminho as recebe junto com o número.
 
 ```bash
 curl -s localhost:8000/health
+curl -s "localhost:8000/api/painel?origem=2025-12-20"
 curl -s "localhost:8000/api/previsao?data=2025-12-15&prioridade=3&horizonte=D%2B7"
 curl -s "localhost:8000/api/risco-ola?data=2025-12-15&prioridade=3"
 curl -s "localhost:8000/api/atipicos?inicio=2025-11-20&fim=2025-12-31&prioridade=2"
@@ -130,6 +133,75 @@ Datas para percorrer os quatro casos (P3, D+7): `2025-11-10` treino · `2025-11-
 ---
 
 ## Os painéis
+
+### Painel principal
+
+**Datas.** Qualquer origem de 01/09 a 31/12/2025, o intervalo em que com e sem intervenção estão
+os dois dentro da própria janela. Antes de 01/09 o modelo `sem_intervencao` só extrapolaria sobre
+o regime pré-automação. Uma etiqueta discreta ao lado da data diz em que período ela cai:
+**treino** (o modelo viu esses dias no ajuste, então o acerto é otimista), **teste**, **fronteira**
+(embargo) ou **produção** (sem real para comparar, como em 31/12).
+
+**Gráficos.** Com intervenção fica na base da pilha (é o que consome analista) e sem intervenção
+em cima; a última barra, em tom claro, é a previsão. O D+1 aparece sobre os últimos 14 dias. O D+7
+aparece sobre as últimas 4 semanas, cada barra sendo o `soma7` que fecha naquele dia, então a
+semana prevista fica na mesma unidade das realizadas. Quando o período previsto já tem real, um
+losango escuro marca o total realizado, e as fichas, o tooltip e a tabela o abrem em com e sem. A faixa de 80 % de cada modelo vai no tooltip e na tabela:
+a faixa da soma não é a soma das faixas, então não é desenhada.
+
+**O modelo `total` não está no painel.** A pilha prevista é a soma dos dois modelos por tipo, e o
+número de destaque é essa soma. Mostrar também o modelo único poria dois "totais" que não batem
+na mesma tela. Ele continua em `/detalhe`.
+
+**KPIs.** O acumulado das regras de OLA é anual e zera em 01/01 (`api/ola.py::painel_kpis`):
+
+- **ano corrente** — `painel()` até 31/12: chance de cair de faixa e data provável de cruzar o
+  próximo corte. A perna do modelo é o D+7 quando os 7 dias cabem antes do fim do ano, e o D+1
+  quando não cabem. Em 31/12 mostra o atingimento final (P2 duração 75 %, P3 125 %, volume 0 %
+  com a faixa estourada);
+- **ano novo no ritmo atual** — só quando a semana prevista atravessa 01/01 (origens de 25/12 em
+  diante). O acumulado parte de zero; os dias do D+7 que caem em 2026 vêm do modelo (grupo
+  `total`), e o resto do ano é a taxa de 28 dias mantida constante.
+
+⚠️ O ano novo é um ano extrapolado a partir de dezembro, e por isso sai quase binário (0 % ou
+100 %). A informação útil é a **data de cruzamento**: no volume, P2 e P3 cruzam o primeiro corte
+entre o fim de fevereiro e março de 2026, porque as faixas de volume continuam descalibradas.
+
+**Rosca.** Cada regra com meta ganha uma rosca. O anel é a escala de 0 a 150 %; o arco é o
+atingimento do dia, na cor da faixa (azul acima da meta, verde em 100 %, laranja e vermelho
+abaixo — tokens `--ola-*` de `marca.css`); o tracinho marca a meta de 100 %. O trecho entre a
+faixa atual e a de baixo pulsa em vermelho, com intensidade proporcional à chance de perdê-lo até
+31/12. Quem pede `prefers-reduced-motion` recebe o trecho sem animação.
+
+**Como a chance de quebra é calculada** (`api/ola.py::painel`, Monte Carlo):
+
+1. **hoje** — o acumulado anual da prioridade inteira (`s_fato_ola_prioridade`) e a faixa em que
+   ele cai;
+2. **taxas das últimas 28 dias** — fechados por aberto, violações por fechado, fechados por dia
+   (média e desvio);
+3. **perna do modelo** — a previsão D+7 do grupo `total` (D+1 quando os 7 dias não cabem até
+   31/12), convertida em fechamentos. A incerteza sai da faixa de 80 % da previsão;
+4. **perna da taxa** — os dias restantes até 31/12 à média diária, com desvio crescendo com a
+   raiz do número de dias;
+5. **2.000 sorteios** da soma das duas pernas, com semente fixa, para o número não oscilar entre
+   recargas. Na regra de duração as violações entram como Poisson sobre os fechamentos. **A chance
+   de quebra é a fração dos sorteios em que o acumulado cruza o corte e cai de faixa.** O risco é
+   baixo abaixo de 20 %, moderado até 50 % e alto daí em diante;
+6. **data provável de cruzamento** — o que falta até o corte dividido pela média diária.
+
+O caso que valida o painel: em 20/12/2025 a P3 tinha 197 violações contra o corte de 201. O painel
+dá 89 % de chance e cruzamento previsto em 26/12, e a P3 cruzou de fato em 26/12.
+
+⚠️ Ponto em aberto: a perna do modelo usa o modelo `total`, não a soma com + sem que o painel
+desenha. Os dois podem divergir.
+
+**A marca de ingênuo não aparece no painel** (decisão da autora, 2026-09-10). A resposta de
+`/api/painel` continua carregando o fato no bloco `avisos`, e a página de detalhes o mostra ao
+lado de cada previsão.
+
+**Marca.** Cor, fonte, raio e sombra vivem só em `api/web/marca.css`; o logo fica em
+`api/web/marca/logo.svg`. Os valores atuais são **placeholder**. As três cores de grupo são uma
+ordem categórica validada contra daltonismo, e precisam ser revalidadas quando a marca trocar.
 
 ### Risco de cumprimento de OLA
 
@@ -179,10 +251,11 @@ esperados por acaso — 3 deles com marca de sistêmico.
 
 ## Honestidade sobre o que os modelos entregam
 
-**1 de 6 cortes supera o baseline ingênuo** — só `com_intervencao` em D+7 (+36,7 % de MAE). Nos
-outros cinco a regra ingênua erra menos que o modelo. A tela mostra isso ao lado de cada previsão
-(`✅ supera o ingênuo` / `❌ perde do ingênuo`) e a API devolve no bloco `avisos`, com o valor da
-regra ingênua na mesma linha da previsão para comparação direta.
+**11 das 18 séries superam o baseline ingênuo**; as 7 que perdem se concentram em P3/P4 de
+`sem_intervencao`/`total`. A página de detalhes mostra isso ao lado de cada previsão
+(`✅ supera o ingênuo` / `❌ perde do ingênuo`), com o valor da regra ingênua na mesma linha. A
+API devolve o mesmo fato no bloco `avisos` de toda rota, inclusive `/api/painel`. A exceção é o
+painel principal, que não renderiza a marca (ver acima).
 
 A recomendação registrada no projeto vale aqui: usar o modelo em produção onde ele ganha, e o
 próprio ingênuo como referência operacional nos demais.
@@ -212,11 +285,11 @@ Azure está em [`../azure/provisionar.sh`](../azure/provisionar.sh).
 
 | Arquivo | O que garante |
 |---|---|
-| `test_reproducao.py` | **portão de qualidade** — as 18 combinações replicadas contra `g_previsoes.csv`; também a identidade `soma7(D+7) = acumulado D+1..D+7` e `total = com + sem`. ⚠️ **Falha na safra atual** — foi escrito assumindo `modelo in ("ARIMA", "SARIMA")`, e o manifesto atual tem `SARIMAX`/`ETS`/`Theta` (ver `docs/CONTRATO_MODELOS.md` §7) |
+| `test_reproducao.py` | **portão de qualidade** — as 18 séries (534 origens de teste, as três famílias) replicadas contra `g_previsoes.csv` com tolerância de 0,011; também a identidade `soma7(D+7) = acumulado D+1..D+7` e `total = com + sem` |
 | `test_classificacao.py` | os selos nas fronteiras exatas; 6 origens de embargo por série no D+7, nenhuma no D+1; contagem de origens de teste batendo com a cobertura da gold |
 | `test_ola.py` | o atingimento calculado reproduz `s_fato_ola_prioridade` dia a dia; P4 sem meta; faixa de volume estourada sinalizada; o alerta de 15/12 caindo a ≤ 3 dias do cruzamento real |
+| `test_painel.py` | a rota do painel: intervalo de datas aceito (01/09 a 31/12), pilha prevista = soma dos dois modelos, semana prevista emendando na última realizada, etiqueta treino/teste/produção, bloco de ano novo só na virada |
 
-**Reprodução pela HTTP não reverificada nesta safra.** A afirmação anterior desta seção (534
-origens, divergência máxima 0,00) valia para o serving em `.pkl` puro; com `ETS`/`Theta` em
-`.json` no manifesto, `api/previsao.py` precisa do caminho de carga descrito em
-`docs/CONTRATO_MODELOS.md` §7 antes que essa verificação volte a valer.
+A reprodução passa por `prev.prever()`, a mesma função que as rotas HTTP chamam. As rotas em si
+foram exercitadas com o `TestClient` do FastAPI: `/health` com 18 modelos, `/api/painel` nas duas
+origens, 422 para origem fora do painel, e as rotas da página de detalhes.

@@ -8,7 +8,10 @@ const NOME_GRUPO = {
   sem_intervencao: ['sem_intervencao', 'fechou sozinho no monitoramento'],
   total: ['total', 'modelo único sobre a prioridade inteira'],
 };
-const COR_GRUPO = { com_intervencao: '#2980b9', sem_intervencao: '#c0392b', total: '#2c3e50' };
+// Cores de grupo vêm dos tokens de marca.css — as mesmas do painel principal.
+const COR_GRUPO = Object.fromEntries(Object.entries({
+  com_intervencao: '--grupo-com', sem_intervencao: '--grupo-sem', total: '--grupo-total',
+}).map(([g, t]) => [g, getComputedStyle(document.documentElement).getPropertyValue(t).trim()]));
 
 let CATALOGO = null;
 let grafico = null;
@@ -116,10 +119,10 @@ function renderEntradas(entradas) {
           ${Object.entries(entradas[bloco] || {}).map(([k, v]) =>
             `<div class="par"><span>${k}</span><span>${v === null ? '—' : num(v, Number.isInteger(v) ? 0 : 3)}</span></div>`).join('')}
         </div>`).join('')}
-      <p class="nota">As exógenas que este horizonte entrega ao modelo:
+      <p class="nota">As exógenas que o modelo desta série (grupo total) recebe:
         ${Object.keys(entradas.exogenas_do_modelo).length
           ? Object.entries(entradas.exogenas_do_modelo).map(([k, v]) => `<b>${k}</b>=${num(v, 2)}`).join(' · ')
-          : 'nenhuma — o vencedor deste corte é ARIMA puro, só o histórico da própria série.'}</p>
+          : 'nenhuma — o modelo desta série (SARIMAX sem exógena, ETS ou Theta) lê só o histórico da própria série.'}</p>
     </details>`;
 }
 

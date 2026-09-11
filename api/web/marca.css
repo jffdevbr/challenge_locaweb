@@ -1,0 +1,49 @@
+/* Marca da solução — o ÚNICO arquivo com cor, fonte, raio e sombra literais.
+   Trocar a marca é editar os valores abaixo (e o conteúdo de `marca/`); nenhum outro arquivo da
+   pasta web tem hex solto.
+
+   ⚠️ PLACEHOLDER: valores neutros até o arquivo de referência da marca chegar. */
+:root {
+  /* --- identidade ------------------------------------------------------------------------ */
+  --marca-primaria: #1c5cab;            /* faixa do topo, chips ativos */
+  --marca-primaria-contraste: #ffffff;  /* texto sobre a primária */
+  --marca-destaque: #2a78d6;            /* links, foco, botões */
+  --marca-fonte: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* --- superfícies e tinta --------------------------------------------------------------- */
+  --marca-fundo: #f9f9f7;               /* plano da página */
+  --marca-superficie: #fcfcfb;          /* cartões e área do gráfico */
+  --marca-borda: #e1e0d9;
+  --marca-tinta: #0b0b0b;               /* texto principal */
+  --marca-tinta-2: #52514e;             /* texto secundário */
+  --marca-tinta-3: #898781;             /* rótulos de eixo, texto mudo */
+  --marca-raio: 10px;
+  --marca-sombra: 0 1px 2px rgba(11, 11, 11, 0.06);
+
+  /* --- identidade dos grupos nos gráficos ------------------------------------------------ */
+  /* Ordem categórica fixa e validada contra daltonismo (todos os pares, 3 cores). A cor segue
+     o grupo, nunca a posição: um filtro não repinta ninguém. Ao trocar pela marca, validar de
+     novo com o `validate_palette.js`. */
+  --grupo-com: #2a78d6;
+  --grupo-sem: #eb6834;
+  --grupo-total: #1baf7a;
+
+  /* --- status (reservado: nunca usado como cor de série) --------------------------------- */
+  --status-bom: #0ca30c;
+  --status-atencao: #fab219;
+  --status-serio: #ec835a;
+  --status-critico: #d03b3b;
+
+  /* --- atingimento de OLA, uma cor por faixa da escala 150 → 0 ------------------------- */
+  /* Acima da meta em azul (mais forte no topo), na meta em verde, abaixo nos tons de status. */
+  --ola-150: #1c5cab;
+  --ola-125: #5598e7;
+  --ola-100: #0ca30c;
+  --ola-75: #ec835a;
+  --ola-50: #d03b3b;
+  --ola-0: #d03b3b;
+
+  /* --- cromo do gráfico ------------------------------------------------------------------ */
+  --grade: #e1e0d9;
+  --eixo: #c3c2b7;
+}
