@@ -146,9 +146,7 @@ precisa levar o dado junto.
   ```
 
   Sem a chave o notebook **roda até o fim assim mesmo**: o cache de rótulos em `s_dim_template.csv`
-  cobre os templates já vistos e os inéditos viram um aviso, não um erro. Atenção ao espaço antes
-  do `=`: `MINHA_CHAVE_API_CLAUDE = valor` cria uma variável chamada `"MINHA_CHAVE_API_CLAUDE "` e o
-  `getenv` devolve `None`.
+  cobre os templates já vistos e os inéditos viram um aviso, não um erro.
 
 Os três notebooks detectam sozinhos se estão no Google Colab ou na máquina local (`IN_COLAB`).
 Localmente, os caminhos são **relativos à pasta `notebooks/`** (`../0_raw_data/`, `../2_silver_data/`),
