@@ -39,7 +39,12 @@
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/7c857865-9299-40d6-9531-ecfd12637992/scratchpad/v2_375.png --window-size=600,2600 --virtual-time-budget=15000 file:///C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/7c857865-9299-40d6-9531-ecfd12637992/scratchpad/moldura.html)",
       "Bash(curl -s -o /dev/null -w \"painel 31/12: %{http_code} em %{time_total}s\\\\n\" \"http://localhost:8000/api/painel?origem=2025-12-31\")",
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/7c857865-9299-40d6-9531-ecfd12637992/scratchpad/v3_375b.png --window-size=600,1400 --virtual-time-budget=20000 file:///C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/7c857865-9299-40d6-9531-ecfd12637992/scratchpad/moldura.html)",
-      "Bash(./.venv/Scripts/python.exe -c \"import xml.dom.minidom as m; m.parse\\('docs/arquitetura_azure.drawio'\\); print\\('drawio: XML ok'\\)\")"
+      "Bash(./.venv/Scripts/python.exe -c \"import xml.dom.minidom as m; m.parse\\('docs/arquitetura_azure.drawio'\\); print\\('drawio: XML ok'\\)\")",
+      "Bash(git fetch *)",
+      "Bash(rm .git/refs/remotes/origin/main)",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "Bash(git push *)"
     ]
   }
 }
