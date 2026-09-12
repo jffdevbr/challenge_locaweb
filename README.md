@@ -23,26 +23,57 @@ cumprimento de OLA, dimensionamento de capacidade e detecção de dias atípicos
 
 ## O resultado, sem maquiagem
 
-A decisão do modelo passou a ser por **série** (`grupo × prioridade × horizonte`, 18 no total), não
-mais por `grupo × horizonte` agregado — escolher no agregado deixava a série de maior volume
-decidir sozinha por todo o grupo. **11 das 18 séries superam o baseline ingênuo**; no critério
-agregado anterior isso seria 2 de 6:
+A decisão do modelo é por **série** (`grupo × prioridade × horizonte`, 18 no total), não por
+`grupo × horizonte` agregado — escolher no agregado deixava a série de maior volume decidir
+sozinha por todo o grupo. **11 das 18 séries superam o baseline ingênuo**; no critério agregado
+anterior (`grupo × horizonte`, 6 combinações) isso seria só 2 de 6.
 
-| Grupo | Horizonte | MAE agregado (3 prioridades) | MAE ingênuo | Ganho agregado |
-|---|---|---|---|---|
-| `com_intervencao` | D+1 | **14,70** | 15,87 | ✅ **+7,4 %** |
-| `com_intervencao` | D+7 | **63,84** | 91,90 | ✅ **+30,5 %** |
-| `sem_intervencao` | D+1 | 56,33 | **54,13** | ❌ −4,1 % |
-| `sem_intervencao` | D+7 | 548,97 | **458,86** | ❌ −19,6 % |
-| `total` | D+1 | 59,62 | **59,21** | ❌ −0,7 % |
-| `total` | D+7 | 521,75 | **462,97** | ❌ −12,7 % |
+| Grupo | Prioridade | Horizonte | Modelo | Real no teste (mín–máx / média)\* | MAE modelo | MAE ingênuo | Ganho | Treino÷teste\*\* | Resultado |
+|---|---|---|---|---|---|---|---|---|---|
+| `com_intervencao` | P2 | D+1 | SARIMAX | 5–185 / 31,7 | 20,47 | 22,79 | +10,1 % | 7,7× | ✅ |
+| `com_intervencao` | P2 | D+7 | SARIMAX | 89–575 / 181,3 | 65,91 | 148,83 | +55,7 % | 9,0× | ✅ |
+| `com_intervencao` | P3 | D+1 | ETS | 1–128 / 40,5 | 17,10 | 17,52 | +2,4 % | 7,7× | ✅ |
+| `com_intervencao` | P3 | D+7 | Theta | 68–445 / 308,3 | 92,33 | 92,58 | +0,3 % | 9,0× | ✅ |
+| `com_intervencao` | P4 | D+1 | SARIMAX | 0–39 / 17,3 | 6,52 | 7,29 | +10,5 % | 7,7× | ✅ |
+| `com_intervencao` | P4 | D+7 | SARIMAX | 11–172 / 132,4 | 33,29 | 34,28 | +2,9 % | 9,0× | ✅ |
+| `sem_intervencao` | P2 | D+1 | Theta | 4–156 / 38,0 | 24,20 | 27,96 | +13,5 % | 3,4× | ✅ |
+| `sem_intervencao` | P2 | D+7 | SARIMAX | 163–412 / 285,9 | 72,02 | 100,23 | +28,1 % | 4,3× | ✅ |
+| `sem_intervencao` | P3 | D+1 | Theta | 74–585 / 284,2 | 75,72 | 65,43 | −15,7 % | 3,4× | ❌ |
+| `sem_intervencao` | P3 | D+7 | SARIMAX | 760–3.254 / 1.984,5 | 1.188,51 | 745,14 | −59,5 % | 4,3× | ❌ |
+| `sem_intervencao` | P4 | D+1 | Theta | 302–708 / 491,8 | 69,06 | 69,00 | −0,1 % | 3,4× | ❌ |
+| `sem_intervencao` | P4 | D+7 | Theta | 2.700–4.067 / 3.509,7 | 386,36 | 531,23 | +27,3 % | 4,3× | ✅ |
+| `total` | P2 | D+1 | ETS | 15–181 / 59,6 | 28,47 | 36,54 | +22,1 % | 3,4× | ✅ |
+| `total` | P2 | D+7 | SARIMAX | 254–547 / 452,8 | 134,97 | 121,73 | −10,9 % | 4,3× | ❌ |
+| `total` | P3 | D+1 | Theta | 111–624 / 319,1 | 80,66 | 71,43 | −12,9 % | 3,4× | ❌ |
+| `total` | P3 | D+7 | SARIMAX | 1.069–3.440 / 2.250,5 | 1.017,15 | 709,09 | −43,4 % | 4,3× | ❌ |
+| `total` | P4 | D+1 | Theta | 305–736 / 507,1 | 69,73 | 69,68 | −0,1 % | 3,4× | ❌ |
+| `total` | P4 | D+7 | ETS | 2.711–4.235 / 3.623,1 | 413,13 | 558,09 | +26,0 % | 4,3× | ✅ |
+
+\* valor real no teste (`g_previsoes.csv`), em incidentes/dia no D+1 e em incidentes/semana
+(`soma7`) no D+7 — as duas escalas não são comparáveis entre si.
+\*\* dias de treino (`n_treino`) ÷ origens de teste do horizonte — quanto maior, mais dado o
+modelo viu antes de ser avaliado. `com_intervencao` treinou com 323 dias; `sem_intervencao` e
+`total`, com 94.
+
+**Por que as 7 que perdem, perdem** — nenhum motivo novo em relação ao que os dicionários já
+registram, só reunido aqui:
+
+- **4 delas — `sem_intervencao`/`total`, prioridade 3, nos dois horizontes** — a série **triplica
+  dentro da própria janela de teste** (~104/dia em novembro para ~273/dia em dezembro: um degrau,
+  não uma tendência). O treino termina antes do salto, e nenhuma família, transformação ou
+  hiperparâmetro escolhido pela validação acompanha isso — é limitação de dado, não de modelagem.
+- **2 delas — `sem_intervencao`/`total`, prioridade 4, D+1** — o ganho é −0,1 % nas duas, ou seja,
+  empate técnico. O efeito mínimo detectável nesse grupo/horizonte é de 16,5–20,2 % (ver *Os
+  tamanhos de teste foram dimensionados* em `3_gold_data/data_dictionary.md`), então uma diferença
+  desse tamanho não é decidível com o teste atual.
+- **1 delas — `total`, prioridade 2, D+7** — é exatamente o corte em que separar por tipo vence por
+  **+47 %** (`3_gold_data/g_comparacao_grao.csv`): o modelo único treinado sobre o total perde a
+  estrutura que os modelos separados de `com_intervencao` e `sem_intervencao` capturam sozinhos.
 
 Recomendação registrada: usar em produção apenas o modelo que supera o ingênuo na sua série —
-hoje, 11 das 18 — e a própria regra ingênua como referência operacional nas outras 7,
-concentradas em P3 de `sem_intervencao`/`total`, cujo nível salta dentro da própria janela de
-teste (limitação de dado, não de modelo). O detalhamento por série está em
-[`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md) e em
-[`docs/CONTRATO_MODELOS.md`](docs/CONTRATO_MODELOS.md) §8.
+hoje, 11 das 18 — e a própria regra ingênua como referência operacional nas outras 7. O
+detalhamento por série está em [`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md)
+e em [`docs/CONTRATO_MODELOS.md`](docs/CONTRATO_MODELOS.md) §8.
 
 A página de detalhes e a API mostram esse fato ao lado de cada previsão. O painel principal é a
 única exceção, por decisão da autora: ele mostra o número do modelo sem a marca de ingênuo e
