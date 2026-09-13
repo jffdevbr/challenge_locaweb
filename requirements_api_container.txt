@@ -6,8 +6,8 @@ pandas==2.2.2
 scipy==1.16.3
 statsmodels==0.14.6
 
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
 
 # Monitoramento (Azure Monitor / Application Insights) — ver api/main.py.
 # O exportador (pacote separado, versionado em beta) pinado explicitamente: da b53 em diante ele
