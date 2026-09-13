@@ -35,7 +35,17 @@ body {
   display: flex; align-items: center; gap: 10px;
   color: inherit; text-decoration: none; font-weight: 650; font-size: 16px;
 }
-.marca-logo { height: 28px; width: auto; display: block; }
+.marca-logo { height: 38px; width: 38px; display: block; border-radius: 8px; }
+.marca-nome { display: flex; flex-direction: column; line-height: 1.1; }
+.marca-nome b { font-size: 19px; font-weight: 700; letter-spacing: 1.5px; }
+.marca-nome small { font-size: 11px; font-weight: 500; letter-spacing: .3px; opacity: .8; }
+.topo-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+/* Botão de tema: vive sobre o marinho do topo nos dois temas, então usa a tinta do topo. */
+.alternar-tema {
+  font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+  background: transparent; color: inherit; border: 1px solid rgba(238, 222, 209, .45); cursor: pointer;
+}
+.alternar-tema:hover { background: rgba(255, 255, 255, .12); filter: none; }
 .navegacao { display: flex; gap: 4px; }
 .navegacao a {
   color: inherit; text-decoration: none; font-size: 13px; font-weight: 600;
@@ -64,8 +74,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 20px clamp(16px, 4vw, 32px) 4
 }
 .grupo-chips button:hover { border-color: var(--marca-destaque); filter: none; }
 .grupo-chips button[aria-pressed="true"] {
-  background: var(--marca-primaria); border-color: var(--marca-primaria);
-  color: var(--marca-primaria-contraste);
+  background: var(--marca-acao); border-color: var(--marca-acao);
+  color: var(--marca-acao-texto);
 }
 .grupo-chips .chave { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 
@@ -101,8 +111,14 @@ section > h2, .cartao > h2 {
 }
 .coluna-graficos { display: grid; gap: 18px; min-width: 0; }
 .coluna-graficos > section { margin-bottom: 0; }
+/* O Chart.js fixa a largura do canvas em px. Item de grade tem `min-width: auto` e não encolhe
+   abaixo do conteúdo: ao estreitar a janela, o cartão ficava preso na largura antiga e o gráfico
+   invadia a coluna dos KPIs. Com `min-width: 0` o contêiner encolhe, o Chart.js percebe e
+   redesenha na largura nova. */
+.coluna-graficos > section, .grafico-caixa { min-width: 0; }
 /* A altura inclui a faixa do eixo x — o canvas nunca ganha rolagem interna. */
 .grafico-caixa { position: relative; height: 300px; }
+.grafico-caixa canvas { max-width: 100%; }
 @media (max-width: 600px) { .grafico-caixa { height: 270px; } }
 
 /* Seletor de data do painel, com passo de um dia. */
@@ -187,7 +203,7 @@ body.carregando main { opacity: .6; transition: opacity .15s; }
 .campo .dica { font-size: 11px; color: var(--texto-fraco); }
 button {
   font: inherit; font-weight: 600; padding: 8px 18px; border: 0; border-radius: 6px;
-  background: var(--marca-destaque); color: var(--marca-primaria-contraste); cursor: pointer;
+  background: var(--marca-acao); color: var(--marca-acao-texto); cursor: pointer;
 }
 button:hover { filter: brightness(1.08); }
 button.secundario { background: transparent; color: var(--marca-destaque); border: 1px solid var(--borda); }
@@ -224,7 +240,7 @@ button.secundario { background: transparent; color: var(--marca-destaque); borde
 .selo-sem-features { background: #eceff1; color: #607d8b; }
 
 .marca { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.marca.ganha { color: #006300; }
+.marca.ganha { color: var(--status-bom); }
 .marca.perde { color: var(--critico); }
 
 /* --- Avisos ---------------------------------------------------------------------------------- */
@@ -254,4 +270,3 @@ details summary { cursor: pointer; font-size: 12.5px; padding: 6px 0; }
 .nota { font-size: 11.5px; color: var(--texto-fraco); margin-top: 10px; font-style: italic; }
 .vazio { color: var(--texto-fraco); font-style: italic; padding: 10px 0; }
 .erro { color: var(--critico); font-weight: 600; }
-.pagina-detalhe canvas { max-height: 300px; }

@@ -3,22 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Painel · Previsão de incidentes</title>
-  <link rel="icon" href="/static/marca/logo.svg">
+  <title>DDIP · Painel de incidentes</title>
+  <link rel="icon" href="/static/marca/ddip.svg">
+  <!-- Síncrono e antes do CSS: aplica o tema antes da primeira pintura. -->
+  <script src="/static/tema.js"></script>
   <link rel="stylesheet" href="/static/marca.css">
   <link rel="stylesheet" href="/static/estilo.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body class="pagina-painel">
   <header class="topo">
-    <a class="marca-assinatura" href="/">
-      <img class="marca-logo" src="/static/marca/logo.svg" alt="">
-      <span class="marca-nome">Previsão de incidentes</span>
+    <a class="marca-assinatura" href="/" aria-label="DDIP — painel">
+      <img class="marca-logo" src="/static/marca/ddip.svg" alt="">
+      <span class="marca-nome"><b>DDIP</b><small>data driven incident preventor</small></span>
     </a>
-    <nav class="navegacao" aria-label="Páginas">
-      <a href="/" aria-current="page">Painel</a>
-      <a href="/detalhe">Detalhes</a>
-    </nav>
+    <div class="topo-acoes">
+      <nav class="navegacao" aria-label="Páginas">
+        <a href="/" aria-current="page">Painel</a>
+        <a href="/detalhe">Detalhes</a>
+      </nav>
+      <button type="button" class="alternar-tema" id="alternar-tema">☾ Modo escuro</button>
+    </div>
   </header>
 
   <main>
@@ -79,6 +84,7 @@
   </main>
 
   <footer class="rodape">
+    <b>DDIP</b> — um mergulho nos dados da Locaweb.<br>
     Metodologia, desempenho de cada modelo, o modelo total e qualquer data do histórico em
     <a href="/detalhe">Detalhes</a>.
   </footer>

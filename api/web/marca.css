@@ -1,49 +1,95 @@
-/* Marca da solução — o ÚNICO arquivo com cor, fonte, raio e sombra literais.
-   Trocar a marca é editar os valores abaixo (e o conteúdo de `marca/`); nenhum outro arquivo da
-   pasta web tem hex solto.
+/* Marca DDIP — data driven incident preventor. O ÚNICO arquivo com cor, fonte, raio e sombra
+   literais: trocar a marca é editar os valores abaixo (e o conteúdo de `marca/`); nenhum outro
+   arquivo da pasta web tem hex solto.
 
-   ⚠️ PLACEHOLDER: valores neutros até o arquivo de referência da marca chegar. */
+   Paleta da apresentação: azuis #01386A · #23496B · #3774AB, creme #EEDED1, cinza #3A393F.
+   Dois temas, escolhidos por `data-tema` na raiz (ver tema.js): claro (fundo creme, tinta cinza)
+   e escuro (fundo cinza, tinta creme). O topo é marinho nos dois — é o fundo da própria logo. */
 :root {
+  color-scheme: light;
+
   /* --- identidade ------------------------------------------------------------------------ */
-  --marca-primaria: #1c5cab;            /* faixa do topo, chips ativos */
-  --marca-primaria-contraste: #ffffff;  /* texto sobre a primária */
-  --marca-destaque: #2a78d6;            /* links, foco, botões */
-  --marca-fonte: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --marca-primaria: #01386a;            /* faixa do topo = fundo da logo */
+  --marca-primaria-contraste: #eeded1;  /* texto sobre a primária = desenho da logo */
+  --marca-acao: #3774ab;                /* botões e chip ativo */
+  --marca-acao-texto: #ffffff;
+  --marca-destaque: #23496b;            /* links e foco */
+  /* Aptos onde estiver instalada no sistema; Segoe UI é a vizinha mais próxima no Windows. */
+  --marca-fonte: "Aptos", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+                 Roboto, Helvetica, Arial, sans-serif;
 
   /* --- superfícies e tinta --------------------------------------------------------------- */
-  --marca-fundo: #f9f9f7;               /* plano da página */
-  --marca-superficie: #fcfcfb;          /* cartões e área do gráfico */
-  --marca-borda: #e1e0d9;
-  --marca-tinta: #0b0b0b;               /* texto principal */
-  --marca-tinta-2: #52514e;             /* texto secundário */
-  --marca-tinta-3: #898781;             /* rótulos de eixo, texto mudo */
+  --marca-fundo: #eeded1;               /* plano da página */
+  --marca-superficie: #f7f1ea;          /* cartões e área do gráfico, um tom acima do creme */
+  --marca-borda: #dccbbb;
+  --marca-tinta: #3a393f;               /* texto principal */
+  --marca-tinta-2: #5e5c63;             /* texto secundário */
+  --marca-tinta-3: #7f7b80;             /* rótulos de eixo, texto mudo */
   --marca-raio: 10px;
-  --marca-sombra: 0 1px 2px rgba(11, 11, 11, 0.06);
+  --marca-sombra: 0 1px 2px rgba(58, 57, 63, 0.08);
 
   /* --- identidade dos grupos nos gráficos ------------------------------------------------ */
-  /* Ordem categórica fixa e validada contra daltonismo (todos os pares, 3 cores). A cor segue
-     o grupo, nunca a posição: um filtro não repinta ninguém. Ao trocar pela marca, validar de
-     novo com o `validate_palette.js`. */
-  --grupo-com: #2a78d6;
-  --grupo-sem: #eb6834;
-  --grupo-total: #1baf7a;
+  /* Com intervenção em azul claro, sem intervenção em roxo, total em âmbar. Ordem categórica
+     validada contra daltonismo (todos os pares) sobre a superfície de cada tema: roxo × azul se
+     confundem em deuteranopia, e é a diferença de claridade que os mantém separáveis. Ao trocar,
+     validar de novo com o `validate_palette.js` nos dois temas. */
+  --grupo-com: #3fa3dc;
+  --grupo-sem: #7b4bb7;
+  --grupo-total: #c47f1a;
 
   /* --- status (reservado: nunca usado como cor de série) --------------------------------- */
-  --status-bom: #0ca30c;
-  --status-atencao: #fab219;
-  --status-serio: #ec835a;
-  --status-critico: #d03b3b;
+  --status-bom: #2e8b45;
+  --status-atencao: #c98a12;
+  --status-serio: #d2692f;
+  --status-critico: #c0392b;
 
   /* --- atingimento de OLA, uma cor por faixa da escala 150 → 0 ------------------------- */
-  /* Acima da meta em azul (mais forte no topo), na meta em verde, abaixo nos tons de status. */
-  --ola-150: #1c5cab;
-  --ola-125: #5598e7;
-  --ola-100: #0ca30c;
-  --ola-75: #ec835a;
-  --ola-50: #d03b3b;
-  --ola-0: #d03b3b;
+  /* Acima da meta nos azuis da marca (mais escuro = mais folga), na meta em verde, abaixo nos
+     tons de status. */
+  --ola-150: #01386a;
+  --ola-125: #3774ab;
+  --ola-100: #2e8b45;
+  --ola-75: #d2692f;
+  --ola-50: #c0392b;
+  --ola-0: #c0392b;
 
   /* --- cromo do gráfico ------------------------------------------------------------------ */
-  --grade: #e1e0d9;
-  --eixo: #c3c2b7;
+  --grade: #e3d5c7;
+  --eixo: #c9b8a8;
+}
+
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+
+  --marca-acao: #3774ab;
+  --marca-acao-texto: #ffffff;
+  --marca-destaque: #8fb8e3;
+
+  --marca-fundo: #3a393f;
+  --marca-superficie: #47464d;
+  --marca-borda: #5a5960;
+  --marca-tinta: #eeded1;
+  --marca-tinta-2: #cfc3b8;
+  --marca-tinta-3: #a39b94;
+  --marca-sombra: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  --grupo-com: #3f9ed8;
+  --grupo-sem: #8a5acc;
+  --grupo-total: #b5741a;
+
+  --status-bom: #5cc27a;
+  --status-atencao: #e8b34a;
+  --status-serio: #ee8a5a;
+  --status-critico: #e86a5e;
+
+  /* No escuro, "mais folga" é o azul mais saturado; o marinho sumiria no fundo cinza. */
+  --ola-150: #4f93d6;
+  --ola-125: #a9cbea;
+  --ola-100: #5cc27a;
+  --ola-75: #ee8a5a;
+  --ola-50: #e86a5e;
+  --ola-0: #e86a5e;
+
+  --grade: #56555c;
+  --eixo: #6a6970;
 }

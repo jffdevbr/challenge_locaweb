@@ -8,10 +8,21 @@ const NOME_GRUPO = {
   sem_intervencao: ['sem_intervencao', 'fechou sozinho no monitoramento'],
   total: ['total', 'modelo único sobre a prioridade inteira'],
 };
-// Cores de grupo vêm dos tokens de marca.css — as mesmas do painel principal.
-const COR_GRUPO = Object.fromEntries(Object.entries({
-  com_intervencao: '--grupo-com', sem_intervencao: '--grupo-sem', total: '--grupo-total',
-}).map(([g, t]) => [g, getComputedStyle(document.documentElement).getPropertyValue(t).trim()]));
+// Cores vêm dos tokens de marca.css — as mesmas do painel principal — e são relidas quando o
+// tema muda, porque o gráfico guarda a cor do momento em que foi criado.
+let COR_GRUPO = {};
+let COR_SUPERFICIE = '';
+function lerCores() {
+  const estilo = getComputedStyle(document.documentElement);
+  const token = (nome) => estilo.getPropertyValue(nome).trim();
+  COR_GRUPO = { com_intervencao: token('--grupo-com'), sem_intervencao: token('--grupo-sem'),
+                total: token('--grupo-total') };
+  COR_SUPERFICIE = token('--marca-superficie');
+  Chart.defaults.font.family = token('--marca-fonte');
+  Chart.defaults.color = token('--marca-tinta-3');
+  Chart.defaults.borderColor = token('--grade');
+}
+lerCores();
 
 let CATALOGO = null;
 let grafico = null;
@@ -51,10 +62,12 @@ async function iniciar() {
     $('horizonte').value = 'D+7';
     consultar();
   };
+  // Troca de tema: relê as cores e refaz a mesma consulta para redesenhar.
+  document.addEventListener('tema', () => { lerCores(); consultar(); });
   consultar();
 }
 
-const br = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
+const br =(iso) => iso ? iso.split('-').reverse().join('/') : '—';
 
 async function consultar() {
   const params = {
@@ -207,7 +220,7 @@ function renderGrafico(r) {
       const ponto = rotulos.map((d) => (d === s.previsao.data ? s.previsao.valor : null));
       conjuntos.push({
         label: `${grupo} · previsto`, data: ponto,
-        borderColor: COR_GRUPO[grupo], backgroundColor: '#fff',
+        borderColor: COR_GRUPO[grupo], backgroundColor: COR_SUPERFICIE,
         pointRadius: 6, pointStyle: 'circle', pointBorderWidth: 2.5, showLine: false,
       });
       if (s.previsao.real !== null && s.previsao.real !== undefined) {

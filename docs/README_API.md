@@ -199,9 +199,27 @@ desenha. Os dois podem divergir.
 `/api/painel` continua carregando o fato no bloco `avisos`, e a página de detalhes o mostra ao
 lado de cada previsão.
 
-**Marca.** Cor, fonte, raio e sombra vivem só em `api/web/marca.css`; o logo fica em
-`api/web/marca/logo.svg`. Os valores atuais são **placeholder**. As três cores de grupo são uma
-ordem categórica validada contra daltonismo, e precisam ser revalidadas quando a marca trocar.
+**Marca — DDIP (data driven incident preventor).** "Dip" é mergulho: a logo é um mergulhador
+numa rede neural, um mergulho nos dados da Locaweb. Cor, fonte, raio e sombra vivem só em
+`api/web/marca.css`, sobre a paleta da apresentação: azuis `#01386A` · `#23496B` · `#3774AB`,
+creme `#EEDED1` e cinza `#3A393F`.
+
+- **Logo:** `api/web/marca/ddip.svg` é o traçado original (`logo.svg`, mantido intacto) recolorido:
+  desenho creme `#EEDED1` sobre fundo `#01386A`. O fundo da logo é o mesmo marinho do topo, então
+  ela se funde na faixa. `logo_png.png` fica como referência.
+- **Fonte:** Aptos, com Segoe UI e a fonte do sistema como alternativas. A Aptos só aparece onde
+  estiver instalada **no sistema operacional**; o cache de fontes de nuvem do Office não é
+  visível para o navegador. O arquivo da fonte não vai na imagem porque a licença da Microsoft não
+  deixa clara a redistribuição.
+- **Modo claro e escuro:** claro com fundo creme e tinta cinza, escuro com fundo cinza e tinta
+  creme. O botão do topo alterna e guarda a escolha no navegador; sem escolha, a página segue o
+  tema do sistema. `api/web/tema.js` aplica o tema antes da primeira pintura, para não piscar, e
+  avisa as páginas para redesenhar os gráficos, que guardam as cores de quando foram criados.
+- **Cores com significado:** com intervenção em azul claro, sem intervenção em roxo e total em
+  âmbar, uma ordem categórica validada contra daltonismo em cada tema. Roxo e azul se confundem na
+  deuteranopia, e é a diferença de claridade que os separa. A rosca usa os azuis da marca acima
+  da meta, verde na meta e laranja/vermelho abaixo. Ao mexer em qualquer cor de grupo,
+  revalidar com o `validate_palette.js` nos dois temas.
 
 ### Risco de cumprimento de OLA
 

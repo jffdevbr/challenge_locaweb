@@ -3,22 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Detalhes · Previsão de incidentes</title>
-  <link rel="icon" href="/static/marca/logo.svg">
+  <title>DDIP · Detalhes</title>
+  <link rel="icon" href="/static/marca/ddip.svg">
+  <!-- Síncrono e antes do CSS: aplica o tema antes da primeira pintura. -->
+  <script src="/static/tema.js"></script>
   <link rel="stylesheet" href="/static/marca.css">
   <link rel="stylesheet" href="/static/estilo.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body class="pagina-detalhe">
   <header class="topo">
-    <a class="marca-assinatura" href="/">
-      <img class="marca-logo" src="/static/marca/logo.svg" alt="">
-      <span class="marca-nome">Previsão de incidentes</span>
+    <a class="marca-assinatura" href="/" aria-label="DDIP — painel">
+      <img class="marca-logo" src="/static/marca/ddip.svg" alt="">
+      <span class="marca-nome"><b>DDIP</b><small>data driven incident preventor</small></span>
     </a>
-    <nav class="navegacao" aria-label="Páginas">
-      <a href="/">Painel</a>
-      <a href="/detalhe" aria-current="page">Detalhes</a>
-    </nav>
+    <div class="topo-acoes">
+      <nav class="navegacao" aria-label="Páginas">
+        <a href="/">Painel</a>
+        <a href="/detalhe" aria-current="page">Detalhes</a>
+      </nav>
+      <button type="button" class="alternar-tema" id="alternar-tema">☾ Modo escuro</button>
+    </div>
   </header>
 
   <main>
@@ -62,7 +67,7 @@
     <section id="bloco-previsao">
       <h2>Previsão · <span id="titulo-previsao">—</span></h2>
       <div class="cards" id="cards"></div>
-      <div class="rolagem" style="margin-top:16px"><canvas id="grafico"></canvas></div>
+      <div class="grafico-caixa" style="margin-top:16px"><canvas id="grafico"></canvas></div>
     </section>
 
     <section id="bloco-avisos" hidden>

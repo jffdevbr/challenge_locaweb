@@ -44,7 +44,21 @@
       "Bash(rm .git/refs/remotes/origin/main)",
       "Bash(git pull *)",
       "Bash(git stash *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(az group *)",
+      "Bash(export PAUSAR=0)",
+      "Bash(bash azure/provisionar.sh)",
+      "Bash(tee /c/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/deploy_azure.log)",
+      "Bash(node validate_palette.js \"#7B4BB7,#3FA3DC,#C47F1A\" --mode light --pairs all --surface \"#F7F1EA\")",
+      "Bash(node validate_palette.js \"#A77EE0,#6EC1F0,#E0A64A\" --mode dark --pairs all --surface \"#47464D\")",
+      "PowerShell($caminho = \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\"; if \\(Test-Path $caminho\\) { Start-Process $caminho; \"Docker Desktop iniciado\" } else { \"Docker Desktop não encontrado em $caminho\" })",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_claro2.png --window-size=1280,1250 --virtual-time-budget=15000 http://localhost:8000/?data=2025-12-20)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_detalhe_claro.png --window-size=1280,1100 --virtual-time-budget=20000 http://localhost:8000/detalhe)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_375.png --window-size=600,1500 --virtual-time-budget=20000 file:///C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/moldura375.html)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_375b.png --window-size=600,1500 --virtual-time-budget=45000 file:///C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/moldura375.html)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --enable-logging=stderr --v=0 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_500.png --window-size=500,1900 --virtual-time-budget=20000 http://localhost:8000/?data=2025-12-20)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec lw-previsao rm -f /app/api/web/redimensiona.html)",
+      "Bash(curl -s -o /dev/null -w \"página de teste removida \\(agora %{http_code}\\)\\\\n\" http://localhost:8000/static/redimensiona.html)"
     ]
   }
 }

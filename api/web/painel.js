@@ -62,9 +62,15 @@ function iniciar() {
     estado.prioridade = botao.dataset.valor;
     atualizar();
   });
+  coresDoTema();
+  // Troca de tema: os gráficos guardam as cores da criação, então redesenham (dado em cache).
+  document.addEventListener('tema', () => { coresDoTema(); atualizar(); });
+  atualizar();
+}
+
+function coresDoTema() {
   Chart.defaults.font.family = token('--marca-fonte');
   Chart.defaults.color = token('--marca-tinta-3');
-  atualizar();
 }
 
 function irPara(iso) {
