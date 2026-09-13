@@ -67,7 +67,19 @@
       "Bash(curl -sI \"http://localhost:8000/static/painel.js?v=2\")",
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --enable-logging=stderr --v=0 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/azure_todas.png --window-size=1280,1500 --virtual-time-budget=20000 'http://locaweb-previsao-563445.brazilsouth.azurecontainer.io:8000/?data=2025-12-20&prioridade=todas')",
       "Bash(cd /c/.GitHubJFF/challeng_locaweb 2>/dev/null; cd /c/.GitHubJFF/challenge_locaweb && grep -n -i \"pbix\\\\|dashboard\" .gitignore; echo \"---\"; wc -l .gitignore)",
-      "Read(//c/.GitHubJFF/**)"
+      "Read(//c/.GitHubJFF/**)",
+      "Bash(where pdftoppm *)",
+      "Bash(where choco *)",
+      "Bash(where winget *)",
+      "Bash(where scoop *)",
+      "Bash(choco install *)",
+      "Bash(./.venv/Scripts/python.exe -c \"import fitz; print\\('pymupdf ok'\\)\")",
+      "Bash(./.venv/Scripts/python.exe -c \"import pdfplumber; print\\('pdfplumber ok'\\)\")",
+      "Bash(./.venv/Scripts/python.exe -c \"import PyPDF2; print\\('pypdf2 ok'\\)\")",
+      "Bash(./.venv/Scripts/python.exe -c \"import pypdf; print\\('pypdf ok'\\)\")",
+      "Bash(./.venv/Scripts/python.exe -m pip install --quiet pypdf)",
+      "Bash(./.venv/Scripts/python.exe -m pip uninstall -y pypdf --quiet)",
+      "Bash(./.venv/Scripts/python.exe -m pip freeze)"
     ]
   }
 }

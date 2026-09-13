@@ -210,3 +210,5 @@ models/*.json
 
 # artefatos da safra anterior, guardados antes do retreino (dado gerado)
 backup_safra1/
+
+material_apoio_apresentacao/
