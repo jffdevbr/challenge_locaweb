@@ -134,6 +134,18 @@ servidos pelo caminho descrito em `docs/CONTRATO_MODELOS.md` §7, implementado e
 | `api/` | FastAPI (`main.py`, `previsao.py`, `ola.py`, `capacidade.py`, `atipicos.py`) + `web/` |
 | `tests/` | portão de qualidade da reprodução |
 | `docs/` | contrato dos modelos e manual da API |
+| `dashboard/` | relatório Power BI (`Dashboard_Challenge_Locaweb.pbix`) sobre a camada silver, e o dicionário das 6 páginas |
+
+---
+
+## Dashboard (Power BI)
+
+Além da API, o projeto tem um relatório Power BI em `dashboard/Dashboard_Challenge_Locaweb.pbix`
+— 6 páginas (Visão geral, Classificação, Times, ICs, Ruído, OLA) montadas sobre as mesmas tabelas
+da camada silver, com foco em explorar o histórico completo (não a previsão). Ao contrário das
+camadas 0–3 e de `models/`, o `.pbix` **é versionado** — é um artefato de análise, não dado bruto
+nem modelo treinado. Abrir exige Power BI Desktop; o conteúdo de cada página, com o DAX literal de
+cada medida, está em [`dashboard/DICIONARIO_DASHBOARD.md`](dashboard/DICIONARIO_DASHBOARD.md).
 
 ---
 
@@ -314,6 +326,7 @@ o código que descrevem:
 | [`2_silver_data/data_dictionary.md`](2_silver_data/data_dictionary.md) | as 17 tabelas silver, coluna a coluna, com as convenções de `regime` e `tipo_tratamento` |
 | [`3_gold_data/data_dictionary.md`](3_gold_data/data_dictionary.md) | desenho do treino, estudo de features, resultados e ressalvas — sem maquiagem |
 | [`models/manifesto.csv`](models/manifesto.csv) | qual linha de `g_avaliacao_modelos` justifica cada artefato (`familia`, `transformacao`, `exog`, `mae`, `mase`, `mae_ingenuo`, `ganho_vs_ingenuo`, `supera_ingenuo`, `corte_teste`, `configuracao`) |
+| [`dashboard/DICIONARIO_DASHBOARD.md`](dashboard/DICIONARIO_DASHBOARD.md) | as 6 páginas do relatório Power BI: modelo semântico, DAX de cada medida, campo de cada eixo |
 
 ---
 

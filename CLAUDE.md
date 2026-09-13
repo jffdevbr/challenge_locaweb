@@ -25,6 +25,7 @@ automático (`sem_intervencao`).
 | `2_silver_data/` | fatos e dimensões diários | `2_silver_data/data_dictionary.md` |
 | `3_gold_data/` | previsões e avaliação dos modelos | `3_gold_data/data_dictionary.md` |
 | `models/` | 18 vencedores (`.pkl` SARIMAX, `.json` ETS/Theta) + sidecars `.config.json` + `manifesto.csv` | `docs/CONTRATO_MODELOS.md` |
+| `dashboard/` | relatório Power BI (`Dashboard_Challenge_Locaweb.pbix`), sobre a silver | `dashboard/DICIONARIO_DASHBOARD.md` |
 
 Tabelas mais usadas:
 
@@ -50,6 +51,9 @@ repositório recebe só código e documentação. Consequências:
 
 - não sugerir `git add` de dado ou de modelo;
 - qualquer entrega executável precisa levar o dado junto (ver `api/` e o `Dockerfile`).
+
+Exceção: `dashboard/*.pbix` **é versionado** — é relatório/artefato de análise, não dado bruto nem
+modelo treinado.
 
 ## Ler um notebook sem estourar a janela
 
