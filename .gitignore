@@ -207,8 +207,6 @@ pyrightconfig.json
 models/*.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
-# resultados de experimentacao (dado gerado, nao versionado)
-experimentos/resultados/
 
 # artefatos da safra anterior, guardados antes do retreino (dado gerado)
 backup_safra1/
