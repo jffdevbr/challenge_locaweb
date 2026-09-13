@@ -58,7 +58,8 @@
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_375b.png --window-size=600,1500 --virtual-time-budget=45000 file:///C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/moldura375.html)",
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --enable-logging=stderr --v=0 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/ddip_500.png --window-size=500,1900 --virtual-time-budget=20000 http://localhost:8000/?data=2025-12-20)",
       "Bash(MSYS_NO_PATHCONV=1 docker exec lw-previsao rm -f /app/api/web/redimensiona.html)",
-      "Bash(curl -s -o /dev/null -w \"página de teste removida \\(agora %{http_code}\\)\\\\n\" http://localhost:8000/static/redimensiona.html)"
+      "Bash(curl -s -o /dev/null -w \"página de teste removida \\(agora %{http_code}\\)\\\\n\" http://localhost:8000/static/redimensiona.html)",
+      "Bash(git commit -m 'remove pasta experimentos \\(não usada no pipeline\\) *)"
     ]
   }
 }

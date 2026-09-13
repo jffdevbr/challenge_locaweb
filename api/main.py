@@ -311,11 +311,12 @@ def _painel(origem):
     d = pd.Timestamp(origem)
     previsoes = {(g, p, h): prev.prever(DOMINIO, MODELOS, g, p, h, d)
                  for g in GRUPOS_PAINEL for p in cfg.PRIORIDADES for h in cfg.HORIZONTES}
+    blocos = {p: _bloco_prioridade(p, d, previsoes) for p in cfg.PRIORIDADES}
     return {
         "origem": origem,
         "intervalo": {"inicio": cfg.PAINEL_INICIO, "fim": cfg.PAINEL_FIM},
         "situacao": _situacao_painel(previsoes),
-        "prioridades": {p: _bloco_prioridade(p, d, previsoes) for p in cfg.PRIORIDADES},
+        "prioridades": {**blocos, "todas": _bloco_agregado(blocos)},
         "kpis": {p: mod_ola.painel_kpis(DOMINIO, MODELOS, p, d) for p in cfg.PRIORIDADES},
         "avisos": _avisos_painel(previsoes),
     }
@@ -352,6 +353,46 @@ def _previsao_empilhada(previsoes, p, horizonte, d):
         **{k: {"previsao": r["previsao"], "banda": r["banda"], "real": r["real"],
                "familia": r["familia"]}
            for k, r in partes.items()},
+    }
+
+
+def _somar(valores):
+    return None if any(v is None for v in valores) else round(sum(valores), 2)
+
+
+def _bloco_agregado(blocos):
+    """A visão "todas as prioridades": a soma dos blocos de P2, P3 e P4.
+
+    Não existe modelo para a prioridade inteira somada — a previsão agregada é a soma das seis
+    previsões (2 tipos × 3 prioridades), do mesmo jeito que a pilha já soma com + sem. A faixa
+    não entra: a faixa de uma soma não é a soma das faixas, e o bloco vem com `banda` nula em vez
+    de um número inventado.
+    """
+    partes = list(blocos.values())
+
+    def pilha(series, chaves):
+        return [{**{k: pontos[0][k] for k in chaves},
+                 "com": _somar([x["com"] for x in pontos]),
+                 "sem": _somar([x["sem"] for x in pontos])}
+                for pontos in zip(*series)]
+
+    def previsao(h):
+        blocos_h = [x[h] for x in partes]
+
+        def tipo(g):
+            return {"previsao": _somar([x[g]["previsao"] for x in blocos_h]), "banda": None,
+                    "real": _somar([x[g]["real"] for x in blocos_h]), "familia": None}
+
+        return {"inicio": blocos_h[0]["inicio"], "fim": blocos_h[0]["fim"],
+                "previsto": _somar([x["previsto"] for x in blocos_h]),
+                "real": _somar([x["real"] for x in blocos_h]),
+                "com": tipo("com"), "sem": tipo("sem")}
+
+    return {
+        "diario": pilha([x["diario"] for x in partes], ["data"]),
+        "semanal": pilha([x["semanal"] for x in partes], ["inicio", "fim"]),
+        "d1": previsao("d1"),
+        "d7": previsao("d7"),
     }
 
 

@@ -153,6 +153,12 @@ a faixa da soma não é a soma das faixas, então não é desenhada.
 número de destaque é essa soma. Mostrar também o modelo único poria dois "totais" que não batem
 na mesma tela. Ele continua em `/detalhe`.
 
+**Visão agregada ("Todas").** Não existe modelo para "todas as prioridades": gráficos e números
+somam o realizado e as previsões das três prioridades (seis modelos: 2 tipos × 3 prioridades), e
+a API devolve isso pronto em `prioridades.todas`. A faixa de 80 % não aparece na visão agregada,
+porque a faixa de uma soma não é a soma das faixas. Os KPIs de OLA **não** são somados: as faixas
+são calibradas por prioridade, e o cartão mostra as roscas de cada uma, uma embaixo da outra.
+
 **KPIs.** O acumulado das regras de OLA é anual e zera em 01/01 (`api/ola.py::painel_kpis`):
 
 - **ano corrente** — `painel()` até 31/12: chance de cair de faixa e data provável de cruzar o

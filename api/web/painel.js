@@ -33,6 +33,10 @@ const wash = (hex, alfa) => {
 };
 const chave = (grupo) => `<span class="chave" style="background:var(--grupo-${grupo})"></span>`;
 const soma = (par) => (par.com === null || par.sem === null ? null : par.com + par.sem);
+const nomePrioridade = () => (estado.prioridade === 'todas' ? 'todas as prioridades' : `P${estado.prioridade}`);
+// A URL acompanha data e prioridade: copiar o endereço dá o link exato do que está na tela.
+const guardarNaUrl = () => history.replaceState(null, '',
+  `?data=${estado.origem}&prioridade=${estado.prioridade}`);
 
 async function carregar(origem) {
   if (!cache[origem]) {
@@ -49,9 +53,11 @@ async function carregar(origem) {
 // ================================================================================================
 
 function iniciar() {
-  // `?data=AAAA-MM-DD` abre o painel direto numa data — link de demonstração.
-  const pedida = new URLSearchParams(location.search).get('data');
-  if (pedida) $('data').value = pedida;
+  // `?data=AAAA-MM-DD&prioridade=3|todas` abre o painel direto numa data e numa prioridade —
+  // link de demonstração.
+  const pedido = new URLSearchParams(location.search);
+  if (pedido.get('data')) $('data').value = pedido.get('data');
+  if (['2', '3', '4', 'todas'].includes(pedido.get('prioridade'))) estado.prioridade = pedido.get('prioridade');
   estado.origem = $('data').value;
   $('data').addEventListener('change', () => irPara($('data').value));
   $('dia-anterior').addEventListener('click', () => irPara(somaDias(estado.origem, -1)));
@@ -60,6 +66,7 @@ function iniciar() {
     const botao = e.target.closest('button[data-valor]');
     if (!botao || estado.prioridade === botao.dataset.valor) return;
     estado.prioridade = botao.dataset.valor;
+    guardarNaUrl();
     atualizar();
   });
   coresDoTema();
@@ -78,7 +85,7 @@ function irPara(iso) {
   if (!iso || iso < campo.min || iso > campo.max) return;
   estado.origem = iso;
   campo.value = iso;
-  history.replaceState(null, '', `?data=${iso}`);
+  guardarNaUrl();
   atualizar();
 }
 
@@ -97,7 +104,7 @@ async function atualizar() {
     renderNumeros(b);
     renderD1(b);
     renderD7(b);
-    renderKpis(dados.kpis[estado.prioridade]);
+    renderKpis(dados.kpis);
     $('erro').hidden = true;
   } catch (e) {
     $('erro').textContent = e.message;
@@ -218,6 +225,8 @@ function graficoPilha(id, rotulos, realizado, previsao) {
     }
     if (ctx.dataset.label === 'Com · previsto' || ctx.dataset.label === 'Sem · previsto') {
       const f = faixa(ctx.dataset.label.startsWith('Com') ? 'com' : 'sem');
+      // Visão agregada: a faixa de uma soma não é a soma das faixas — sem faixa, sem inventar.
+      if (!f) return ` ${ctx.dataset.label}: ${num(v)} (soma das 3 prioridades)`;
       return ` ${ctx.dataset.label}: ${num(v)} (faixa de ${f.confianca_pct}%: ${num(f.inferior)}–${num(f.superior)})`;
     }
     return ` ${ctx.dataset.label}: ${num(v)}`;
@@ -264,7 +273,7 @@ function tabela(id, linhas) {
 function renderD1(b) {
   const rotulos = [...b.diario.map((p) => dm(p.data)), dm(b.d1.inicio)];
   graficoPilha('grafico-d1', rotulos, b.diario, b.d1);
-  $('sub-d1').textContent = `Incidentes abertos por dia, P${estado.prioridade}: os últimos `
+  $('sub-d1').textContent = `Incidentes abertos por dia, ${nomePrioridade()}: os últimos `
     + `${b.diario.length} dias e a previsão de ${dma(b.d1.inicio)}.`;
   tabela('tabela-d1', [
     ...b.diario.map((p) => [dma(p.data), p.com, p.sem, 'realizado']),
@@ -277,7 +286,7 @@ function renderD7(b) {
   const semana = (i, f) => `${dm(i)}–${dm(f)}`;
   const rotulos = [...b.semanal.map((s) => semana(s.inicio, s.fim)), semana(b.d7.inicio, b.d7.fim)];
   graficoPilha('grafico-d7', rotulos, b.semanal, b.d7);
-  $('sub-d7').textContent = `Incidentes abertos por semana, P${estado.prioridade}: as últimas `
+  $('sub-d7').textContent = `Incidentes abertos por semana, ${nomePrioridade()}: as últimas `
     + `${b.semanal.length} semanas e o acumulado previsto de ${dm(b.d7.inicio)} a ${dm(b.d7.fim)}.`;
   tabela('tabela-d7', [
     ...b.semanal.map((s) => [semana(s.inicio, s.fim), s.com, s.sem, 'realizado']),
@@ -372,18 +381,35 @@ function linhaAnoNovo(r) {
     <span class="valor">${pct(a.probabilidade_de_quebra)}</span></div>`;
 }
 
-function renderKpis(k) {
-  const virada = Object.values(k.regras || {}).some((r) => r.ano_novo);
-  $('sub-kpis').textContent = `P${estado.prioridade} · acumulado anual da prioridade inteira, `
-    + `a partir de ${dma(estado.origem)}.${virada ? ' A semana prevista atravessa a virada: o ano novo começa do zero.' : ''}`;
+function renderKpis(kpis) {
+  // As faixas de OLA são calibradas por prioridade: na visão agregada não existe acumulado que se
+  // some. Cada prioridade aparece com as suas roscas, uma embaixo da outra.
+  const todas = estado.prioridade === 'todas';
+  const lista = todas ? Object.keys(kpis) : [estado.prioridade];
+  const virada = lista.some((p) => Object.values(kpis[p].regras || {}).some((r) => r.ano_novo));
+  $('sub-kpis').textContent = (todas
+    ? 'Cada prioridade com o seu acumulado anual: as faixas de OLA são por prioridade e não se somam. '
+    : `P${estado.prioridade} · acumulado anual da prioridade inteira. `)
+    + `A partir de ${dma(estado.origem)}.${virada ? ' A semana prevista atravessa a virada: o ano novo começa do zero.' : ''}`;
 
+  const blocos = lista.map((p) => (todas ? `<div class="kpi-prioridade">P${p}</div>` : '')
+    + kpisDaPrioridade(kpis[p], p));
+  const temMeta = lista.some((p) => kpis[p].tem_meta);
+  const legenda = 'O anel vai de 0 a 150%, e o tracinho é a meta de 100%. O trecho vermelho que pulsa '
+    + 'é a faixa que se perde se o acumulado cruzar o próximo corte até 31/12: quanto mais forte, mais provável.';
+  const metodo = lista.map((p) => (kpis[p].avisos || []).find((a) => a.texto.startsWith('A leitura de')))
+    .find(Boolean);
+  $('kpis').innerHTML = blocos.join('') + (temMeta ? `<p class="nota">${legenda}</p>` : '')
+    + (metodo ? `<p class="nota">${metodo.texto}</p>` : '');
+}
+
+function kpisDaPrioridade(k, p) {
   if (!k.tem_meta) {
-    $('kpis').innerHTML = `<p class="vazio">P${estado.prioridade} não tem meta de OLA definida, nem de
-      duração nem de volume. É uma pendência aberta com a área, e o painel não inventa número.</p>`;
-    return;
+    return `<p class="vazio">P${p} não tem meta de OLA definida, nem de duração nem de volume. É uma
+      pendência aberta com a área, e o painel não inventa número.</p>`;
   }
 
-  const blocos = Object.entries(REGRAS).map(([nome, titulo]) => {
+  return Object.entries(REGRAS).map(([nome, titulo]) => {
     const r = k.regras[nome];
     if (!r.tem_meta) return `<div class="kpi"><h3>${titulo}</h3><p class="vazio">Sem meta definida.</p></div>`;
     return `<div class="kpi">
@@ -393,13 +419,7 @@ function renderKpis(k) {
         <div class="kpi-linhas">${linhaCorrente(r)}${linhaAnoNovo(r)}</div>
       </div>
     </div>`;
-  });
-
-  const legenda = 'O anel vai de 0 a 150%, e o tracinho é a meta de 100%. O trecho vermelho que pulsa '
-    + 'é a faixa que se perde se o acumulado cruzar o próximo corte até 31/12: quanto mais forte, mais provável.';
-  const metodo = (k.avisos || []).find((a) => a.texto.startsWith('A leitura de'));
-  $('kpis').innerHTML = blocos.join('') + `<p class="nota">${legenda}</p>`
-    + (metodo ? `<p class="nota">${metodo.texto}</p>` : '');
+  }).join('');
 }
 
 iniciar();

@@ -59,6 +59,23 @@ def test_etiqueta_da_data(cliente, origem, chave):
     assert painel(cliente, origem)["situacao"]["chave"] == chave
 
 
+def test_visao_agregada_soma_as_tres_prioridades(cliente):
+    """"Todas" não tem modelo próprio: é a soma das previsões e dos realizados das 3 prioridades.
+
+    A faixa não se soma (a de uma soma não é a soma das faixas), então vem vazia — a tela mostra
+    o valor sem faixa em vez de inventar uma.
+    """
+    b = painel(cliente, "2025-12-15")["prioridades"]
+    todas, partes = b["todas"], [b[p] for p in ("2", "3", "4")]
+    for h in ("d1", "d7"):
+        assert abs(todas[h]["previsto"] - sum(x[h]["previsto"] for x in partes)) < 0.05
+        assert abs(todas[h]["real"] - sum(x[h]["real"] for x in partes)) < 0.05
+        assert todas[h]["com"]["banda"] is None and todas[h]["sem"]["banda"] is None
+    for serie in ("diario", "semanal"):
+        for tipo in ("com", "sem"):
+            assert todas[serie][-1][tipo] == pytest.approx(sum(x[serie][-1][tipo] for x in partes))
+
+
 def test_ano_novo_so_quando_a_semana_atravessa_a_virada(cliente):
     def duracao(origem):
         return painel(cliente, origem)["kpis"]["3"]["regras"]["duracao"]

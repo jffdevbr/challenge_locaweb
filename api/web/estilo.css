@@ -141,6 +141,13 @@ section > h2, .cartao > h2 {
 .kpi { border-top: 1px solid var(--borda); padding: 12px 0 4px; }
 .kpi:first-child { border-top: 0; padding-top: 4px; }
 .kpi h3 { margin: 0 0 6px; font-size: 14px; font-weight: 650; }
+/* Visão agregada: cabeçalho de cada prioridade dentro do cartão de KPIs. */
+.kpi-prioridade {
+  margin: 16px 0 2px; padding-top: 12px; border-top: 2px solid var(--borda);
+  font-size: 12px; font-weight: 700; letter-spacing: .8px; color: var(--texto-fraco);
+}
+.kpi-prioridade:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.kpi-prioridade + .kpi { border-top: 0; padding-top: 4px; }
 .kpi-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; }
 .kpi-linha .rotulo { font-size: 12.5px; color: var(--texto-fraco); }
 .kpi-linha .valor { font-size: 22px; font-weight: 650; white-space: nowrap; }
