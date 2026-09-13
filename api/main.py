@@ -489,16 +489,32 @@ def atipicos(inicio: str = Query(...),
 # Página web
 # ==================================================================================================
 
-app.mount("/static", StaticFiles(directory=cfg.CAMINHO_WEB), name="static")
+class EstaticosRevalidados(StaticFiles):
+    """Estáticos com `Cache-Control: no-cache`: o navegador revalida a cada acesso.
+
+    Sem o cabeçalho, o navegador decide sozinho por quanto tempo reaproveitar a cópia antiga — e
+    depois de um deploy a página nova carregava o JS e o CSS do deploy anterior (estilo antigo e
+    erro no botão "Todas"). Revalidar custa um 304 quando nada mudou, graças ao ETag.
+    """
+
+    def file_response(self, *args, **kwargs):
+        resposta = super().file_response(*args, **kwargs)
+        resposta.headers["Cache-Control"] = "no-cache"
+        return resposta
+
+
+SEM_CACHE = {"Cache-Control": "no-cache"}
+
+app.mount("/static", EstaticosRevalidados(directory=cfg.CAMINHO_WEB), name="static")
 
 
 @app.get("/", include_in_schema=False)
 def pagina():
     """Painel principal — os números da virada do ano."""
-    return FileResponse(cfg.CAMINHO_WEB / "index.html")
+    return FileResponse(cfg.CAMINHO_WEB / "index.html", headers=SEM_CACHE)
 
 
 @app.get("/detalhe", include_in_schema=False)
 def pagina_detalhe():
     """Página de detalhes — qualquer data, selos, ressalvas e os três painéis de negócio."""
-    return FileResponse(cfg.CAMINHO_WEB / "detalhe.html")
+    return FileResponse(cfg.CAMINHO_WEB / "detalhe.html", headers=SEM_CACHE)

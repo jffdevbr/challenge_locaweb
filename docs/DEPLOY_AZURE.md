@@ -232,6 +232,19 @@ az container restart --resource-group rg-locaweb-previsao --name aci-locaweb-pre
 O `restart` baixa de novo a imagem da tag. Se ele não pegar a imagem nova, rodar de novo
 `bash azure/provisionar.sh` recria o container no lugar, porque os passos são idempotentes.
 
+`--no-logs` evita o travamento do cliente `az` no Windows ao imprimir o log do build (o
+`UnicodeEncodeError` do passo 2): o comando só enfileira, e o status se acompanha com
+`az acr task list-runs --registry acrlocaweb563445 --top 1 -o table` até ficar `Succeeded`.
+
+**Cache do navegador depois de reimplantar.** Um reimplante já chegou a mostrar a página nova com o
+JS e o CSS do deploy anterior (estilo antigo e erro `Cannot read properties of undefined (reading
+'regras')` no botão "Todas"): os estáticos saíam sem `Cache-Control`, e o navegador reaproveitava
+a cópia velha por conta própria. Desde então, as páginas e tudo em `/static` saem com
+`Cache-Control: no-cache` (`api/main.py::EstaticosRevalidados`) — o navegador revalida a cada
+acesso e recebe 304 quando nada mudou. As páginas também referenciam os arquivos com `?v=N`: ao
+mudar CSS ou JS de um jeito que precise chegar a quem já tem cache antigo, subir o `N` em
+`index.html` e `detalhe.html`.
+
 **Estado registrado aqui:** a execução documentada acima é **anterior** à safra atual de modelos
 e ao painel novo. Para levar a versão atual (SARIMAX, ETS e Theta; páginas `/` e `/detalhe`), o
 procedimento é só o bloco acima, e não precisa de nenhum ajuste de infraestrutura:

@@ -61,7 +61,10 @@
       "Bash(curl -s -o /dev/null -w \"página de teste removida \\(agora %{http_code}\\)\\\\n\" http://localhost:8000/static/redimensiona.html)",
       "Bash(git commit -m 'remove pasta experimentos \\(não usada no pipeline\\) *)",
       "Bash(tee /c/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/deploy_azure2.log)",
-      "Bash(ps -W)"
+      "Bash(ps -W)",
+      "Bash(export PYTHONIOENCODING=utf-8 MSYS_NO_PATHCONV=1)",
+      "Bash(curl -s --retry 30 --retry-all-errors --retry-delay 2 -o /dev/null -w \"local health: %{http_code}\\\\n\" http://localhost:8000/health)",
+      "Bash(curl -sI \"http://localhost:8000/static/painel.js?v=2\")"
     ]
   }
 }
