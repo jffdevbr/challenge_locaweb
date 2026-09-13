@@ -64,7 +64,8 @@
       "Bash(ps -W)",
       "Bash(export PYTHONIOENCODING=utf-8 MSYS_NO_PATHCONV=1)",
       "Bash(curl -s --retry 30 --retry-all-errors --retry-delay 2 -o /dev/null -w \"local health: %{http_code}\\\\n\" http://localhost:8000/health)",
-      "Bash(curl -sI \"http://localhost:8000/static/painel.js?v=2\")"
+      "Bash(curl -sI \"http://localhost:8000/static/painel.js?v=2\")",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --hide-scrollbars --blink-settings=preferredColorScheme=1 --enable-logging=stderr --v=0 --screenshot=C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/328ab5c0-c531-4038-9d2f-e40102cca302/scratchpad/azure_todas.png --window-size=1280,1500 --virtual-time-budget=20000 'http://locaweb-previsao-563445.brazilsouth.azurecontainer.io:8000/?data=2025-12-20&prioridade=todas')"
     ]
   }
 }
