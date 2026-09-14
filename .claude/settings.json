@@ -79,7 +79,21 @@
       "Bash(./.venv/Scripts/python.exe -c \"import pypdf; print\\('pypdf ok'\\)\")",
       "Bash(./.venv/Scripts/python.exe -m pip install --quiet pypdf)",
       "Bash(./.venv/Scripts/python.exe -m pip uninstall -y pypdf --quiet)",
-      "Bash(./.venv/Scripts/python.exe -m pip freeze)"
+      "Bash(./.venv/Scripts/python.exe -m pip freeze)",
+      "Bash(az --version)",
+      "Bash(PAUSAR=0 bash azure/provisionar.sh)",
+      "Bash(export MSYS_NO_PATHCONV=1)",
+      "Bash(chcp.com 65001)",
+      "Bash(curl -s -m 15 http://locaweb-previsao-563445.brazilsouth.azurecontainer.io:8000/health)",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Read(//c/Users/pc/OneDrive/Documentos/Estudos/Faculdade/challenge locaweb/EC_Sprint_4_2TSCPW_solucaofinal_DDIP/**)",
+      "Bash(PYTHONIOENCODING=utf-8 C:/.GitHubJFF/challenge_locaweb/.venv/Scripts/python.exe -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 cat references/color-formula.md)",
+      "Bash(PYTHONIOENCODING=utf-8 cat references/anti-patterns.md)",
+      "Bash(node scripts/validate_palette.js \"#4f93d6,#e86a5e\" --mode dark --surface \"#3a393f\")",
+      "Bash(node --input-type=module -e \"console.log\\(JSON.stringify\\(process.argv\\)\\)\" \"#4f93d6,#e86a5e\" --mode dark)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe \"C:/Users/pc/AppData/Local/Temp/claude/c---GitHubJFF-challenge-locaweb/db94fb78-0cf1-4255-b369-9087c1f6c007/scratchpad/grafico_ranking_modelos.py\")"
     ]
   }
 }
